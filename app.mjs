@@ -77,7 +77,8 @@ function paintPreparation(latest=null,batchId=null){
     const total=batch.wordIds.length,complete=batch.wordIds.filter(wid=>usable(db.words.find(w=>w.id===wid))).length;
     const configured=!!contentConfig.apiBase&&contentConfig.automaticQueriesApproved&&contentConfig.contentRetentionApproved;
     const busy=status?.status==='preparing'&&preparer.isRunning(id);
-    let message=busy?'正在准备词典内容。':status?.code?preparationMessage(status.code):complete===total?'本批内容已就绪。':status?.needsReview?'候选内容已取得，词义或情境仍待核对。':configured?'词表已保存，可以准备学习内容。':'词典服务未配置，当前没有准备任务正在运行。';
+    const configurationCode=!contentConfig.apiBase?'UNCONFIGURED':!configured?'PERMISSION_REQUIRED':null;
+    let message=busy?'正在准备词典内容。':configurationCode?preparationMessage(configurationCode):status?.code?preparationMessage(status.code):complete===total?'本批内容已就绪。':status?.needsReview?'候选内容已取得，词义或情境仍待核对。':configured?'词表已保存，可以准备学习内容。':'词典服务未配置，当前没有准备任务正在运行。';
     const elapsed=busy?Math.min(150,Math.floor((Date.now()-status.startedAt)/1000)):Math.floor((status?.elapsedMs||0)/1000);
     const details=busy?`已用 ${elapsed} 秒 · 本轮最多 150 秒${status.estimateMs!==null?` · 预计查询还需约 ${Math.ceil(status.estimateMs/1000)} 秒`:' · 剩余时间正在估算'}`:status?.status==='timeout'?'本轮已结束；重试只处理未完成部分。':'';
     const baseKey=canonical({status:status?.status,code:status?.code,complete,total,finished:status?.finished,needsReview:status?.needsReview,failed:status?.failed,busy,configured});
