@@ -1,10 +1,12 @@
-// Controlled integration of the unmodified app source. No real audio or API calls.
+// Controlled integration of actual app source. Capture only the startup audit promise
+// so assertions wait for real readiness, rather than an arbitrary number of event-loop turns.
+// No real audio or API calls.
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import vm from 'node:vm';
 import * as core from './core.mjs';import * as content from './content.mjs';
 import {createPlayback} from './media.mjs';
 const settle=async()=>{for(let i=0;i<15;i++)await new Promise(setImmediate)};
-async function setup({phase='sound',secondMissing=false,lookup,mediaDevices}={}){
+async function setup({phase='sound',secondMissing=false,lookup,mediaDevices,auditDelayMs=0}={}){
   const db=core.fresh();core.createBatch(db,'worda,wordb','TEST ONLY');const reviews=[];
   const contents=[];
   for(const [i,w]of db.words.entries()){
@@ -21,6 +23,7 @@ async function setup({phase='sound',secondMissing=false,lookup,mediaDevices}={})
   }};
   const document={querySelector(key){if(['#spelling','#sentence','#resumePrepared'].includes(key))return nodes.get(key)||null;if(!nodes.has(key))nodes.set(key,make(key));return nodes.get(key)},querySelectorAll(){return[]},createElement(){return make('button')}};
   const ctx=vm.createContext({...core,...content,console,document,structuredClone,
+    checkReviewedContent:async(...args)=>{if(auditDelayMs)await new Promise(resolve=>setTimeout(resolve,auditDelayMs));return content.checkReviewedContent(...args)},
     localStorage:{getItem:()=>stored,setItem:(k,v)=>stored=v},location:{hash:'#home'},
     window:{addEventListener(){},scrollTo(){}},URL,Blob,setTimeout,clearTimeout,setInterval:()=>0,
     navigator:{mediaDevices:mediaDevices||{getUserMedia:async()=>{throw Error('denied')}}},
@@ -33,12 +36,12 @@ async function setup({phase='sound',secondMissing=false,lookup,mediaDevices}={})
     },
     createPreparer:options=>(preparer=content.createPreparer(options))
   });
-  const source=fs.readFileSync(new URL('./app.mjs',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
-  vm.runInContext(source,ctx);await settle();
+  const source=fs.readFileSync(new URL('./app.mjs',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/^void auditStoredContent\(\);$/m,'globalThis.__startupAudit = auditStoredContent();');
+  vm.runInContext(source,ctx);await ctx.__startupAudit;await settle();
   vm.runInContext('active=db.sessions[0].id;render()',ctx);await settle();
   return{ctx,nodes,audios,db,contents,reviews,get preparer(){return preparer},get rootWrites(){return rootWrites},state:()=>JSON.parse(vm.runInContext('JSON.stringify(db)',ctx)),run:code=>vm.runInContext(code,ctx)};
 }
 test('后台内容更新不重建练习区，不清空未提交默写',async()=>{const t=await setup({phase:'spell',secondMissing:true});const field=t.nodes.get('#spelling');field.value='unsaved spelling';const before=t.rootWrites;await t.preparer.run(t.db.batches[0].id);assert.equal(t.rootWrites,before);assert.equal(t.nodes.get('#spelling').value,'unsaved spelling');assert.equal(t.state().events.length,0);assert.equal(t.state().words[1].content.senseId,'wordb#1')});
 test('页面集成：连续重播、退出、切换词后旧音频不写记录',async()=>{const t=await setup();const first=t.audios[0],ended=first.onended;const replay=t.nodes.get('#lesson').children.find(x=>x.textContent==='播放词典录音');await replay.onclick();assert(first.paused);t.run("go('home');db.sessions[0].index=1;active=db.sessions[0].id;render()");ended();assert.equal(t.state().events.length,0);t.audios.at(-1).onended();assert.equal(t.state().events[0].wordId,t.db.words[1].id)});
-test('麦克风权限迟到后已离开页面：释放设备，不记录先说',async()=>{let resolve;let stopped=0;const t=await setup({phase:'pronounce',mediaDevices:{getUserMedia:()=>new Promise(r=>resolve=r)}});const record=t.nodes.get('#lesson').children.find(x=>x.textContent==='录音辅助（可选）');const pending=record.onclick();t.run("go('home')");resolve({getTracks:()=>[{stop:()=>stopped++}]});await pending;assert.equal(stopped,1);assert.equal(t.state().events.length,0)});
+test('麦克风权限迟到后已离开页面：释放设备，不记录先说',async()=>{let resolve;let stopped=0;const t=await setup({phase:'pronounce',auditDelayMs:40,mediaDevices:{getUserMedia:()=>new Promise(r=>resolve=r)}});const record=t.nodes.get('#lesson').children.find(x=>x.textContent==='录音辅助（可选）');const pending=record.onclick();t.run("go('home')");resolve({getTracks:()=>[{stop:()=>stopped++}]});await pending;assert.equal(stopped,1);assert.equal(t.state().events.length,0)});
 test('拒绝麦克风不阻塞自行说出与自评入口',async()=>{const t=await setup({phase:'pronounce'});const record=t.nodes.get('#lesson').children.find(x=>x.textContent==='录音辅助（可选）');await record.onclick();assert.match(t.nodes.get('#mediaStatus').textContent,/麦克风不可用/);const said=t.nodes.get('#lesson').children.find(x=>x.textContent==='我已自己说出，接着听原音');said.onclick();assert.equal(t.state().sessions[0].said,true)});
