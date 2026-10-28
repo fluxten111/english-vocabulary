@@ -1,4 +1,4 @@
-import {ready, norm, validateContent} from './core.mjs';
+import {ready, norm, validateContent} from './core.mjs?v=20261028-learning-entry';
 export const MAX_WAIT_MS = 150000;
 export const REQUEST_WAIT_MS = 15000;
 export class PreparationError extends Error {
@@ -14,7 +14,7 @@ const messages = {
   LOOKUP_FAILED:'词典查询失败，请检查网络后重试。',
   SAVE_FAILED:'内容尚未确认保存，已停止准备。请先处理保存问题。',
   INVALID_RESPONSE:'返回内容与请求或核对记录不一致，未作为学习内容使用。',
-  REVIEW_REQUIRED:'已取得候选内容，词义或情境仍需核对。',
+  REVIEW_REQUIRED:'这个词的可靠录音或教学内容尚待补充核对；当前位置已保留。',
   NOT_FOUND:'词典没有找到匹配词条。',
   QUOTA:'词典查询额度或频率已达上限，请稍后再试。',
   INTERRUPTED:'上次准备已中断；没有任务正在后台运行，可重试未完成内容。'
@@ -53,8 +53,8 @@ export async function validatePreparedResponse(word, response, requestId, review
   await checkReviewedContent(word,response.content,reviews);
   return response;
 }
-export function createDictionaryClient(config, {fetcher = fetch, reviews = []} = {}) {
-  function preflight() {
+export function createDictionaryClient(config, {fetcher = fetch, reviews = [], lessons = {}} = {}) {
+  function remotePreflight() {
     if (!config.apiBase) throw fail('UNCONFIGURED',messages.UNCONFIGURED);
     if (!config.automaticQueriesApproved || !config.contentRetentionApproved)
       throw fail('PERMISSION_REQUIRED',messages.PERMISSION_REQUIRED);
@@ -65,8 +65,17 @@ export function createDictionaryClient(config, {fetcher = fetch, reviews = []} =
       throw fail('UNCONFIGURED',messages.UNCONFIGURED);
     return endpoint;
   }
+  // Reviewed original teaching text and links to verified dictionary recordings
+  // are usable independently of permissions for automated dictionary queries.
+  function preflight() { if (Object.keys(lessons).length) return; return remotePreflight(); }
   const lookup = async (word,{signal,requestId}) => {
-    const endpoint=preflight();
+    if (signal?.aborted) throw signal.reason || cancelled();
+    const local=Object.hasOwn(lessons,word.normalized) ? lessons[word.normalized] : null;
+    if(local) return validatePreparedResponse(word,{schema:1,requestId,wordId:word.id,
+      normalizedForm:word.normalized,provider:'merriam-webster/learners',status:'ready',content:structuredClone(local)},requestId,reviews);
+    if(Object.keys(lessons).length && (!config.apiBase || !config.automaticQueriesApproved || !config.contentRetentionApproved))
+      return {schema:1,requestId,wordId:word.id,normalizedForm:word.normalized,provider:'merriam-webster/learners',status:'review_required'};
+    const endpoint=remotePreflight();
     const response = await fetcher(endpoint.href.replace(/\/$/,'')+'/lookup',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({requestId,wordId:word.id,word:word.surface}),signal

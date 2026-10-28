@@ -28,7 +28,7 @@ async function setup({phase='sound',secondMissing=false,lookup,mediaDevices,audi
     window:{addEventListener(){},scrollTo(){}},URL,Blob,setTimeout,clearTimeout,setInterval:()=>0,
     navigator:{mediaDevices:mediaDevices||{getUserMedia:async()=>{throw Error('denied')}}},
     MediaRecorder:class{constructor(stream){this.stream=stream;this.state='inactive'}start(){this.state='recording'}stop(){this.state='inactive'}},
-    reviewedContent:reviews,contentConfig:{apiBase:'https://test.invalid',automaticQueriesApproved:true,contentRetentionApproved:true},
+    reviewedContent:reviews,reviewedLessons:{},contentConfig:{apiBase:'https://test.invalid',automaticQueriesApproved:true,contentRetentionApproved:true},
     createPlayback:options=>createPlayback({...options,createAudio:url=>{const a={url,paused:false,play:()=>Promise.resolve(),pause(){this.paused=true}};audios.push(a);return a}}),
     createDictionaryClient:()=>async(word,args)=>{
       if(lookup)return lookup(word,args,contents);
@@ -45,3 +45,12 @@ test('后台内容更新不重建练习区，不清空未提交默写',async()=>
 test('页面集成：连续重播、退出、切换词后旧音频不写记录',async()=>{const t=await setup();const first=t.audios[0],ended=first.onended;const replay=t.nodes.get('#lesson').children.find(x=>x.textContent==='播放词典录音');await replay.onclick();assert(first.paused);t.run("go('home');db.sessions[0].index=1;active=db.sessions[0].id;render()");ended();assert.equal(t.state().events.length,0);t.audios.at(-1).onended();assert.equal(t.state().events[0].wordId,t.db.words[1].id)});
 test('麦克风权限迟到后已离开页面：释放设备，不记录先说',async()=>{let resolve;let stopped=0;const t=await setup({phase:'pronounce',auditDelayMs:40,mediaDevices:{getUserMedia:()=>new Promise(r=>resolve=r)}});const record=t.nodes.get('#lesson').children.find(x=>x.textContent==='录音辅助（可选）');const pending=record.onclick();t.run("go('home')");resolve({getTracks:()=>[{stop:()=>stopped++}]});await pending;assert.equal(stopped,1);assert.equal(t.state().events.length,0)});
 test('拒绝麦克风不阻塞自行说出与自评入口',async()=>{const t=await setup({phase:'pronounce'});const record=t.nodes.get('#lesson').children.find(x=>x.textContent==='录音辅助（可选）');await record.onclick();assert.match(t.nodes.get('#mediaStatus').textContent,/麦克风不可用/);const said=t.nodes.get('#lesson').children.find(x=>x.textContent==='我已自己说出，接着听原音');said.onclick();assert.equal(t.state().sessions[0].said,true)});
+test('空句不能被保存按钮隐式当成跳过；主动跳过才记录独立造句与未批改状态',async()=>{
+ const t=await setup({phase:'sentence'});
+ const save=t.nodes.get('#lesson').children.find(x=>x.textContent==='保存句子');
+ t.nodes.get('#sentence').value='   ';save.onclick();
+ assert.equal(t.state().events.length,0);assert.equal(t.state().sessions[0].revealed,false);
+ assert.match(t.nodes.get('#error').textContent,/明确点击/);
+ const skip=t.nodes.get('#lesson').children.find(x=>x.textContent==='跳过造句');skip.onclick();
+ const event=t.state().events.at(-1);assert.equal(event.skipped,true);assert.equal(event.exerciseType,'independent');assert.equal(event.feedback,'not_evaluated');
+});
