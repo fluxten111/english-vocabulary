@@ -1,0 +1,17 @@
+name = "vocabulary-dictionary"
+main = "dictionary-worker.mjs"
+compatibility_date = "2026-10-28"
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGIN = "https://fluxten111.github.io"
+MW_AUTOMATIC_QUERIES_APPROVED = "false"
+MW_RETENTION_APPROVED = "false"
+
+[[durable_objects.bindings]]
+name = "QUOTA"
+class_name = "DictionaryQuota"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DictionaryQuota"]

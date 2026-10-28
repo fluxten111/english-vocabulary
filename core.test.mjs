@@ -1,4 +1,4 @@
-import{test}from'node:test';import assert from'node:assert/strict';import{fresh,parse,createBatch,session,groupWords,currentId,ready,act,validate,merge,transaction}from'./core.mjs';
+import{test}from'node:test';import assert from'node:assert/strict';import{fresh,parse,createBatch,session,groupWords,currentId,ready,act,validate,merge,transaction,save}from'./core.mjs';
 function fixture(n=2){const db=fresh();createBatch(db,Array.from({length:n},(_,i)=>'word'+String.fromCharCode(97+i)).join('\n'),'test');for(const w of db.words)w.content={checked:true,senseId:'fixture-not-production',cue:'A test cue.',audio:{kind:'dictionary',url:'https://example.invalid/test.mp3',source:'TEST ONLY',accent:'US',license:'TEST'},ipa:'test',ipaAccent:'US',ipaSource:'TEST',definition:'TEST',definitionSource:'TEST',example:'TEST',exampleSource:'TEST'};return db}
 const store=()=>({text:null,setItem(k,v){this.text=v},getItem(){return this.text}});
 test('词表解析去重、无效项和短语',()=>{assert.deepEqual(parse(' Apple\napple\nICE CREAM,ice cream;bad123;well-known'),{words:['Apple','ICE CREAM','well-known'],duplicates:['apple','ice cream'],invalid:['bad123']})});
@@ -9,7 +9,7 @@ test('说之前禁止听原音；不确定强制再练；拼错强制再练',()=
 test('一组共同经过各阶段，再进入下一组',()=>{const d=fixture(11),s=d.sessions[0];for(let i=0;i<10;i++){assert.equal(s.phase,'sound');act(d,s.id,'listened');act(d,s.id,'next')}assert.equal(s.phase,'pronounce');assert.equal(s.group,0)});
 test('原词表保存并读回；逐步保存可刷新续接',()=>{let d=fresh();const st=store();d=transaction(st,d,c=>createBatch(c,'Apple\nPear','one'));assert.equal(JSON.parse(st.text).batches[0].originalInput,'Apple\nPear');d=fixture(1);st.text=null;d=transaction(st,d,c=>act(c,c.sessions[0].id,'listened'));const restored=validate(JSON.parse(st.text));assert(restored.sessions[0].listened);assert.equal(restored.events.length,1)});
 test('保存失败不改变内存记录与位置',()=>{const d=fixture(1),before=JSON.stringify(d);const st={setItem(){throw Error('quota')},getItem(){return null}};assert.throws(()=>transaction(st,d,c=>act(c,c.sessions[0].id,'listened')));assert.equal(JSON.stringify(d),before)});
-test('读回不一致不得确认成功',()=>assert.throws(()=>transaction({setItem(){},getItem(){return 'wrong'}},fresh(),()=>{})));
+test('读回不一致不得确认成功',()=>assert.throws(()=>save({setItem(){},getItem(){return 'wrong'}},fresh())));
 test('备份往返保留数据，重复导入不重复，冲突不覆盖',()=>{const d=fixture(1),copy=JSON.parse(JSON.stringify(d));assert.deepEqual(merge(fresh(),copy).batches,d.batches);assert.deepEqual(merge(d,copy),d);copy.sessions[0].index=1;assert.throws(()=>merge(d,copy));assert.equal(d.sessions[0].index,0)});
 test('损坏与未知版本备份拒绝',()=>{assert.throws(()=>validate({schema:2}));const d=fixture(1);d.batches[0].wordIds=['missing'];assert.throws(()=>validate(d))});
 test('手动再练保留首次完成时间与历史',()=>{const d=fixture(1),b=d.batches[0];b.completedAt='original';const old=structuredClone(b);const s=session(b,true);d.sessions.push(s);assert(s.replay);assert.deepEqual(b,old);assert.notEqual(s.id,d.sessions[0].id)});
