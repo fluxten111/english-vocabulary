@@ -1,9 +1,10 @@
+import {validateFeedbackResponse} from './sentence-feedback.mjs?v=20261029-opt-final';
 export const norm=s=>s.trim().toLowerCase().replace(/[’]/g,"'").replace(/\s+/g,' ');
 export const id=()=>crypto.randomUUID();
 export const fresh=()=>({schema:1,revision:0,words:[],batches:[],sessions:[],events:[]});
 export function parse(raw){const words=[],duplicates=[],invalid=[];const seen=new Set;for(const token of raw.split(/[\n,;，；\t]+/)){const s=token.trim();if(!s)continue;if(!/^[a-zA-Z]+(?:[ '\-’][a-zA-Z]+)*$/.test(s)){invalid.push(s);continue}const n=norm(s);if(seen.has(n))duplicates.push(s);else{seen.add(n);words.push(s)}}return{words,duplicates,invalid}}
 export function createBatch(db,raw,name,skipExisting=false){const p=parse(raw);const wordIds=[];for(const surface of p.words){let w=db.words.find(w=>w.normalized===norm(surface));if(w&&skipExisting)continue;if(!w){w={id:id(),surface,normalized:norm(surface),content:null};db.words.push(w)}wordIds.push(w.id)}if(!wordIds.length)throw Error('没有可建立批次的词。');const b={id:id(),name:name||'我的词表',originalInput:raw,wordIds,createdAt:new Date().toISOString(),completedAt:null};db.batches.push(b);db.sessions.push(session(b));return b}
-export function session(b,replay=false){return{id:id(),batchId:b.id,replay,status:'new',group:0,phase:'sound',index:0,queue:[],weak:[],revealed:false,said:false,listened:false,answer:'',startedAt:null,completedAt:null,restarts:0}}
+export function session(b,replay=false){return{id:id(),batchId:b.id,replay,status:'new',group:0,phase:'sound',index:0,queue:[],weak:[],revealed:false,said:false,listened:false,answer:'',startedAt:null,completedAt:null,restarts:0,attempt:0}}
 export const groupWords=(db,s)=>db.batches.find(b=>b.id===s.batchId).wordIds.slice(s.group*10,s.group*10+10);
 export const currentId=(db,s)=>s.phase.endsWith('Retry')?s.queue[s.index]:groupWords(db,s)[s.index];
 const isText = (v, max = 20000) => typeof v === 'string' && v.length <= max;
@@ -44,9 +45,80 @@ export function ready(w, phase) {
   return true;
 }
 function change(s,phase){s.phase=phase;s.index=0;s.weak=[];s.queue=[]}
-function next(db,s){s.index++;s.said=false;s.listened=false;s.revealed=false;s.answer='';const count=s.phase.endsWith('Retry')?s.queue.length:groupWords(db,s).length;if(s.index<count)return;switch(s.phase){case'sound':change(s,'pronounce');break;case'pronounce':if(s.weak.length){s.queue=[...s.weak];s.phase='pronounceRetry';s.index=0}else change(s,'teach');break;case'pronounceRetry':change(s,'teach');break;case'teach':change(s,'sentence');break;case'sentence':change(s,'spell');break;case'spell':if(s.weak.length){s.queue=[...s.weak];s.phase='spellRetry';s.index=0}else finishGroup(db,s);break;case'spellRetry':finishGroup(db,s)}}
+function next(db,s){s.attempt=(s.attempt||0)+1;s.index++;s.said=false;s.listened=false;s.revealed=false;s.answer='';const count=s.phase.endsWith('Retry')?s.queue.length:groupWords(db,s).length;if(s.index<count)return;switch(s.phase){case'sound':change(s,'pronounce');break;case'pronounce':if(s.weak.length){s.queue=[...s.weak];s.phase='pronounceRetry';s.index=0}else change(s,'teach');break;case'pronounceRetry':change(s,'teach');break;case'teach':change(s,'sentence');break;case'sentence':change(s,'spell');break;case'spell':if(s.weak.length){s.queue=[...s.weak];s.phase='spellRetry';s.index=0}else finishGroup(db,s);break;case'spellRetry':finishGroup(db,s)}}
 function finishGroup(db,s){const b=db.batches.find(b=>b.id===s.batchId);if((s.group+1)*10<b.wordIds.length){s.group++;change(s,'sound')}else{s.status='completed';s.completedAt=new Date().toISOString();if(!s.replay&&!b.completedAt)b.completedAt=s.completedAt}}
-export function act(db,sid,type,value=''){const s=db.sessions.find(s=>s.id===sid);if(!s||s.status==='completed')throw Error('练习已结束。');const wid=currentId(db,s),w=db.words.find(w=>w.id===wid);if(!ready(w,s.phase))throw Error('当前内容待核对，位置已保留。');const phase=s.phase;const allowed={said:['pronounce','pronounceRetry'],assess:['pronounce','pronounceRetry'],spell:['spell','spellRetry'],sentence:['sentence'],chinese:['teach'],retry:['pronounceRetry','spellRetry']};if(allowed[type]&&!allowed[type].includes(phase))throw Error('当前阶段不能执行此动作。');const event={id:id(),sessionId:s.id,batchId:s.batchId,wordId:wid,phase,type,value,at:new Date().toISOString()};if(type==='said'){s.said=true}else if(type==='listened'){if(phase.startsWith('pronounce')&&!s.said)throw Error('请先自己说，再听录音。');s.listened=true}else if(type==='assess'){if(!s.said||!s.listened||!['correct','wrong','unsure'].includes(value))throw Error('请先说、听，再自评。');if(phase==='pronounce'&&value!=='correct')s.weak.push(wid);next(db,s)}else if(type==='spell'){if(!phase.startsWith('spell')||s.revealed||!value.trim())throw Error('请先输入拼写。');s.answer=value;s.revealed=true;event.correct=norm(value)===w.normalized;if(phase==='spell'&&!event.correct)s.weak.push(wid)}else if(type==='next'){if(phase==='sound'&&!s.listened)throw Error('请先听录音。');if(phase==='sentence'&&!s.revealed)throw Error('请保存句子或明确跳过。');if(phase.startsWith('spell')&&!s.revealed)throw Error('请先提交拼写。');if(phase.startsWith('pronounce'))throw Error('请完成自评。');next(db,s)}else if(type==='sentence'){if(phase!=='sentence')throw Error('阶段不符。');s.revealed=true;s.answer=value;event.skipped=!value.trim();event.exerciseType='independent';event.prompt=w.content.sentencePrompt||w.content.cue;event.example=w.content.example;event.feedback='not_evaluated'}else if(type==='retry'){if(!phase.endsWith('Retry'))throw Error('仅弱项复测可额外重练。');s.said=false;s.listened=false;s.revealed=false;s.answer=''}else if(type==='chinese'){if(phase!=='teach')throw Error('尚不能显示中文。')}else throw Error('未知操作。');s.status=s.status==='completed'?'completed':'active';s.startedAt ||=event.at;db.events.push(event);return event}
+export function act(db,sid,type,value='',options={}){
+  const s=db.sessions.find(x=>x.id===sid);
+  if(!s||s.status==='completed')throw Error('练习已结束。');
+  const wid=currentId(db,s),w=db.words.find(x=>x.id===wid);
+  if(!ready(w,s.phase))throw Error('当前内容待核对，位置已保留。');
+  const phase=s.phase;
+  const allowed={said:['pronounce','pronounceRetry'],assess:['pronounce','pronounceRetry'],spell:['spell','spellRetry'],sentence:['sentence'],chinese:['teach'],hint:['sound'],rerecord:['pronounce','pronounceRetry'],retry:['pronounceRetry','spellRetry']};
+  if(allowed[type]&&!allowed[type].includes(phase))throw Error('当前阶段不能执行此动作。');
+  const event={id:id(),sessionId:s.id,batchId:s.batchId,wordId:wid,phase,type,value,at:new Date().toISOString(),attempt:s.attempt||0,restarts:s.restarts||0};
+  if(type==='said'){
+    if(s.said)throw Error('本次已确认说出，请勿重复提交。');
+    s.said=true;
+  }else if(type==='listened'){
+    if(phase.startsWith('pronounce')&&!s.said)throw Error('请先自己说，再听录音。');
+    s.listened=true;
+  }else if(type==='assess'){
+    if(!s.said||!s.listened||s.revealed||!['correct','wrong','unsure'].includes(value))throw Error('请先说、听，再自评。');
+    if(options.hold&&phase!=='pronounceRetry')throw Error('仅发音重练可以暂留结果。');
+    if(phase==='pronounce'&&value!=='correct')s.weak.push(wid);
+    if(options.hold){
+      s.revealed=true;s.answer=value;event.held=true;
+    }else next(db,s);
+  }else if(type==='spell'){
+    if(!phase.startsWith('spell')||s.revealed||!value.trim())throw Error('请先输入拼写。');
+    s.answer=value;s.revealed=true;event.correct=norm(value)===w.normalized;
+    if(phase==='spell'&&!event.correct)s.weak.push(wid);
+  }else if(type==='next'){
+    if(phase==='sound'&&!s.listened)throw Error('请先听录音。');
+    if(phase==='sentence'&&!s.revealed)throw Error('请保存句子或明确跳过。');
+    if(phase.startsWith('spell')&&!s.revealed)throw Error('请先提交拼写。');
+    if(phase.startsWith('pronounce')&&!(phase==='pronounceRetry'&&s.revealed))throw Error('请完成自评。');
+    next(db,s);
+  }else if(type==='sentence'){
+    if(phase!=='sentence'||s.revealed)throw Error('当前句子已经提交或阶段不符。');
+    s.revealed=true;s.answer=value;event.skipped=!value.trim();event.exerciseType='independent';
+    event.prompt=w.content.sentencePrompt||w.content.cue;event.example=w.content.example;event.feedback='not_evaluated';
+  }else if(type==='retry'||type==='rerecord'){
+    if(type==='retry'&&!phase.endsWith('Retry'))throw Error('仅弱项复测可额外重练。');
+    if(type==='rerecord'&&s.revealed)throw Error('自评已保存，请明确选择再练一次。');
+    s.said=false;s.listened=false;s.revealed=false;s.answer='';s.attempt=(s.attempt||0)+1;
+  }else if(type==='hint'){
+    if(!['chinese','spelling'].includes(value))throw Error('提示种类无效。');
+    if(value==='chinese'&&(!w.content.chinese||!w.content.chineseSource))throw Error('暂无已核对中文释义。');
+    event.hintKind=value;event.senseId=w.content.senseId;
+  }else if(type!=='chinese')throw Error('未知操作。');
+  s.status=s.status==='completed'?'completed':'active';s.startedAt ||=event.at;db.events.push(event);return event;
+}
+export function latestSentenceEvent(db,s){
+  const wid=currentId(db,s);
+  return [...db.events].reverse().find(e=>e.sessionId===s.id&&e.wordId===wid&&['sentence','sentenceRevision'].includes(e.type)&&
+    (e.restarts===undefined||e.restarts===(s.restarts||0)));
+}
+export function addSentenceFeedback(db,sid,request,status,data={}){
+  const s=db.sessions.find(x=>x.id===sid),original=s&&latestSentenceEvent(db,s);
+  if(!s||s.phase!=='sentence'||!s.revealed||!original||original.id!==request.attemptEventId||original.wordId!==request.wordId||
+    !['requested','completed','failed','cancelled'].includes(status))throw Error('句子或阶段已改变，旧反馈没有写入。');
+  const existing=db.events.find(e=>e.type==='sentenceFeedback'&&e.requestId===request.requestId&&e.status===status);
+  if(existing)return existing;
+  if(status==='completed')validateFeedbackResponse(data.response,request);
+  const event={id:id(),sessionId:s.id,batchId:s.batchId,wordId:original.wordId,phase:'sentence',type:'sentenceFeedback',value:'',at:new Date().toISOString(),
+    attemptEventId:original.id,requestId:request.requestId,textHash:request.textHash,senseId:request.senseId,status,attempt:s.attempt||0,restarts:s.restarts||0};
+  if(status==='completed')event.response=data.response;
+  if(status==='failed'||status==='cancelled')event.code=String(data.code||'FAILED').slice(0,100);
+  db.events.push(event);return event;
+}
+export function reviseSentence(db,sid,value){
+  const s=db.sessions.find(x=>x.id===sid),previous=s&&latestSentenceEvent(db,s);
+  if(!s||s.phase!=='sentence'||!s.revealed||!previous||!isText(value)||!value.trim())throw Error('请保留原句，并在造句阶段保存有效修订。');
+  const event={id:id(),sessionId:s.id,batchId:s.batchId,wordId:previous.wordId,phase:'sentence',type:'sentenceRevision',value,at:new Date().toISOString(),
+    parentEventId:previous.type==='sentenceRevision'?previous.parentEventId:previous.id,exerciseType:'revision',attempt:s.attempt||0,restarts:s.restarts||0};
+  s.answer=value;db.events.push(event);return event;
+}
 export function validate(db) {
   if (!db || db.schema !== 1 || !Number.isInteger(db.revision) || db.revision < 0)
     throw Error('备份版本不支持。');
@@ -97,11 +169,24 @@ export function validate(db) {
       !Number.isInteger(s.index) || s.index < 0 || !Array.isArray(s.queue) || !Array.isArray(s.weak) ||
       s.queue.some(x => !b.wordIds.includes(x)) || s.weak.some(x => !b.wordIds.includes(x)) ||
       !isText(s.answer ?? '')) throw Error('学习位置损坏。');
+    if(s.attempt!==undefined&&(!Number.isSafeInteger(s.attempt)||s.attempt<0))throw Error('尝试编号损坏。');
     const flags = ['revealed','said','listened'];
     if (flags.some(k => typeof s[k] !== 'boolean')) throw Error('学习动作状态损坏。');
     if (s.status !== 'completed' && !currentId(db,s)) throw Error('学习位置越界。');
   }
+  const eventMap=new Map(db.events.map(e=>[e.id,e]));
   for (const e of db.events) {
+    if(e.attempt!==undefined&&(!Number.isSafeInteger(e.attempt)||e.attempt<0))throw Error('尝试历史编号损坏。');
+    if(e.type==='hint'&&(!['chinese','spelling'].includes(e.hintKind)||e.phase!=='sound'||!isText(e.senseId,500)))throw Error('提示历史损坏。');
+    if(e.type==='sentenceRevision'||e.type==='sentenceFeedback'){
+      const parent=eventMap.get(e.type==='sentenceRevision'?e.parentEventId:e.attemptEventId);
+      if(!parent||!['sentence','sentenceRevision'].includes(parent.type)||parent.sessionId!==e.sessionId||parent.wordId!==e.wordId||e.phase!=='sentence'||!isText(e.value))throw Error('句子修订或反馈引用损坏。');
+      if(e.type==='sentenceRevision'&&parent.type!=='sentence')throw Error('修订必须保留首次原句。');
+      if(e.type==='sentenceFeedback'){
+        if(!['requested','completed','failed','cancelled'].includes(e.status)||!isText(e.requestId,100)||!e.requestId||!isText(e.senseId,500)||!/^[a-f0-9]{64}$/.test(e.textHash||''))throw Error('反馈状态损坏。');
+        if(e.status==='completed')validateFeedbackResponse(e.response,{requestId:e.requestId,attemptEventId:e.attemptEventId,wordId:e.wordId,senseId:e.senseId,textHash:e.textHash,sentence:parent.value});
+      }
+    }
     const s = sessions.get(e.sessionId), b = batches.get(e.batchId);
     if (!s || !b || s.batchId !== b.id || !b.wordIds.includes(e.wordId) || !words.has(e.wordId))
       throw Error('练习历史与词批次不一致。');

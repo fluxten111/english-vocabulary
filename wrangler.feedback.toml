@@ -1,0 +1,23 @@
+name = "vocabulary-feedback"
+main = "sentence-feedback-worker.mjs"
+compatibility_date = "2026-10-28"
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGIN = "https://fluxten111.github.io"
+FEEDBACK_ENABLED = "true"
+FEEDBACK_QUALITY_APPROVED = "true"
+FEEDBACK_TEST_ONLY = "false"
+FEEDBACK_BENCHMARK_ENABLED = "false"
+FEEDBACK_THINKING = "disabled"
+FEEDBACK_MONTHLY_CNY_LIMIT = "5"
+FEEDBACK_DAILY_LIMIT = "50"
+FEEDBACK_MONTHLY_LIMIT = "1000"
+
+[[durable_objects.bindings]]
+name = "FEEDBACK_BUDGET"
+class_name = "FeedbackBudget"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["FeedbackBudget"]

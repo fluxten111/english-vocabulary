@@ -4,3 +4,6 @@ export const contentConfig = Object.freeze({
   automaticQueriesApproved: false,
   contentRetentionApproved: false
 });
+
+// Enable only after a real provider key, budget and quality checks are ready.
+export const sentenceFeedbackConfig=Object.freeze({apiBase:'https://vocabulary-feedback.cjt110801.workers.dev',enabled:true});
