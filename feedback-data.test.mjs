@@ -18,10 +18,9 @@ test('反馈错配句子或词义被拒绝，原句保持不变',async()=>{
  const {req}=await fixture(),answer=response(req);answer.attemptEventId='wrong-event';assert.throws(()=>validateFeedbackResponse(answer,req));answer.attemptEventId=req.attemptEventId;answer.senseId='wrong-sense';assert.throws(()=>validateFeedbackResponse(answer,req));
 });
 test('超时即返回失败，即使底层请求忽略取消；不得冒充批改成功',async()=>{
- const {req}=await fixture();let deadline;
- const call=createFeedbackClient({apiBase:'https://test.invalid',fetcher:()=>new Promise(()=>{}),setTimer:fn=>{deadline=fn;return 1;},clearTimer:()=>{}})(req);
- for(let i=0;i<8&&!deadline;i++)await new Promise(setImmediate);
- assert(deadline);const failed=assert.rejects(call,{code:'TIMEOUT'});deadline();await failed;
+ const {req}=await fixture();let deadline,notifyTimer;const timerStarted=new Promise(resolve=>notifyTimer=resolve);
+ const call=createFeedbackClient({apiBase:'https://test.invalid',fetcher:()=>new Promise(()=>{}),setTimer:fn=>{deadline=fn;notifyTimer();return 1;},clearTimer:()=>{}})(req);
+ const failed=assert.rejects(call,{code:'TIMEOUT'});await timerStarted;assert(deadline);deadline();await failed;
 });
 test('空模型正文与配额拒绝均作为失败，不产生正确判断',async()=>{
  const {req}=await fixture();for(const [value,status]of [['',200],[JSON.stringify({code:'QUOTA'}),429]]){

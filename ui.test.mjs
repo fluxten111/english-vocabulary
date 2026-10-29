@@ -24,8 +24,9 @@ async function setup({phase='sound',secondMissing=false,lookup,mediaDevices,medi
     insertAdjacentHTML(pos,text){if(text.includes('id="spelling"'))nodes.set('#spelling',make('#spelling'));if(text.includes('id="sentence"'))nodes.set('#sentence',make('#sentence'));},
   }};
   const document={hidden:false,addEventListener(){},createTextNode(text){return {textContent:text}},querySelector(key){if(key==='#sentenceFeedback'){const find=n=>n.id==='sentenceFeedback'?n:(n.children||[]).map(find).find(Boolean);return [...nodes.values()].map(find).find(Boolean)||null;}if(['#spelling','#sentence','#resumePrepared'].includes(key))return nodes.get(key)||null;if(!nodes.has(key))nodes.set(key,make(key));return nodes.get(key)},querySelectorAll(){return[]},createElement(){return make('button')}};
-  const mockFetch=async(url,options)=>url.endsWith('/health')?new Response(JSON.stringify({configured:true,qualityApproved:true})):new Response(JSON.stringify(await feedbackService(JSON.parse(options.body),options)));
-  const ctx=vm.createContext({...core,...content,...feedback,sentenceFeedbackConfig:{enabled:!!feedbackService,apiBase:feedbackService?'https://feedback.test':''},createFeedbackClient:options=>feedback.createFeedbackClient({...options,fetcher:mockFetch}),fetch:mockFetch,AbortController,console,document,structuredClone,
+  let reportStarted;const feedbackStarted=new Promise(resolve=>reportStarted=resolve);
+  const mockFetch=async(url,options)=>{if(url.endsWith('/health'))return new Response(JSON.stringify({configured:true,qualityApproved:true}));const pending=feedbackService(JSON.parse(options.body),options);reportStarted();return new Response(JSON.stringify(await pending));};
+  const ctx=vm.createContext({...core,...content,...feedback,sentenceFeedbackConfig:{enabled:!!feedbackService,apiBase:feedbackService?'https://feedback.test':''},createFeedbackClient:options=>feedback.createFeedbackClient({...options,fetcher:mockFetch}),fetch:mockFetch,feedbackRequest:async(...args)=>{if(feedbackService)await new Promise(resolve=>setTimeout(resolve,20));return feedback.feedbackRequest(...args);},AbortController,console,document,structuredClone,
     checkReviewedContent:async(...args)=>{if(auditDelayMs)await new Promise(resolve=>setTimeout(resolve,auditDelayMs));return content.checkReviewedContent(...args)},
     localStorage:{getItem:()=>stored,setItem:(k,v)=>stored=v},location:{hash:'#home'},
     window:{addEventListener(){},scrollTo(){}},URL,Blob,setTimeout,clearTimeout,setInterval:()=>0,
@@ -41,11 +42,12 @@ async function setup({phase='sound',secondMissing=false,lookup,mediaDevices,medi
     createPreparer:options=>(preparer=content.createPreparer(options))
   });
   const source=fs.readFileSync(new URL('./app.mjs',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/^void auditStoredContent\(\);$/m,'globalThis.__startupAudit = auditStoredContent();');
-  vm.runInContext(source,ctx);await ctx.__startupAudit;await settle();
+  // Capture the actual feedback task, including hashing; do not guess event-loop speed.
+  vm.runInContext(source+'\nconst __actualFeedback=checkSentence;globalThis.__feedbackTasks=[];checkSentence=(...args)=>{const task=__actualFeedback(...args);__feedbackTasks.push(task);return task;};',ctx);await ctx.__startupAudit;await settle();
   const flushPlayback=()=>{for(const [id,fn]of [...mediaTimers]){mediaTimers.delete(id);fn();}};
   vm.runInContext('active=db.sessions[0].id;render()',ctx);flushPlayback();await settle();
   const button=text=>{const all=[];const walk=n=>{all.push(n);for(const c of n.children||[])walk(c)};walk(nodes.get('#lesson'));return all.find(n=>n.textContent===text)};
-  return{ctx,nodes,audios,ownAudios,db,contents,reviews,button,element:pred=>{const walk=n=>pred(n)?n:(n.children||[]).map(walk).find(Boolean);return walk(nodes.get('#lesson'));},get preparer(){return preparer},get rootWrites(){return rootWrites},state:()=>JSON.parse(vm.runInContext('JSON.stringify(db)',ctx)),run:code=>{const value=vm.runInContext(code,ctx);flushPlayback();return value}};
+  return{ctx,nodes,audios,ownAudios,db,contents,reviews,button,feedbackStarted,feedbackDone:()=>Promise.all(ctx.__feedbackTasks),element:pred=>{const walk=n=>pred(n)?n:(n.children||[]).map(walk).find(Boolean);return walk(nodes.get('#lesson'));},get preparer(){return preparer},get rootWrites(){return rootWrites},state:()=>JSON.parse(vm.runInContext('JSON.stringify(db)',ctx)),run:code=>{const value=vm.runInContext(code,ctx);flushPlayback();return value}};
 }
 test('后台内容更新不重建练习区，不清空未提交默写',async()=>{const t=await setup({phase:'spell',secondMissing:true});const field=t.nodes.get('#spelling');field.value='unsaved spelling';const before=t.rootWrites;await t.preparer.run(t.db.batches[0].id);assert.equal(t.rootWrites,before);assert.equal(t.nodes.get('#spelling').value,'unsaved spelling');assert.equal(t.state().events.length,0);assert.equal(t.state().words[1].content.senseId,'wordb#1')});
 test('页面集成：连续重播、退出、切换词后旧音频不写记录',async()=>{const t=await setup();const first=t.audios[0],ended=first.onended;const replay=t.button('播放词典录音');await replay.onclick();assert(first.paused);t.run("go('home');db.sessions[0].index=1;active=db.sessions[0].id;render()");ended();assert.equal(t.state().events.length,0);t.audios.at(-1).onended();assert.equal(t.state().events[0].wordId,t.db.words[1].id)});
@@ -119,32 +121,32 @@ test('发音重练自评后有真实再练与继续入口，不覆盖前次自�
 });
 
 const feedbackAnswer=req=>({schema:1,status:'completed',method:'automated_reference',provider:'deepseek',model:'deepseek-flash',requestId:req.requestId,attemptEventId:req.attemptEventId,wordId:req.wordId,senseId:req.senseId,textHash:req.textHash,result:{assessment:'suggestions',targetUsage:'matches_sense',suggestedSentence:'I have worda.',explanationZh:'主语I应使用have。',issues:[{kind:'grammar',original:'has',suggested:'have',explanationZh:'主谓一致。'}]}});
-test('可选真实接口路径先保存原句，再独立保存反馈并保留继续入口',async()=>{
+test('可选真实接口路径先保存原句，再独立保存反馈并保留继续入口',{timeout:5000},async()=>{
  const t=await setup({phase:'sentence',feedbackService:async req=>feedbackAnswer(req)});
- t.nodes.get('#sentence').value='I has worda.';t.button('保存并检查（DeepSeek）').onclick();await settle();
+ t.nodes.get('#sentence').value='I has worda.';t.button('保存并检查（DeepSeek）').onclick();await t.feedbackDone();
  const events=t.state().events;assert.equal(events.find(e=>e.type==='sentence').value,'I has worda.');assert.equal(events.at(-1).status,'completed');assert(t.button('下一步'));assert(t.element(n=>n.textContent==='修改建议'));
 });
-test('快速重复点击只发起一次检查，不重复调用服务',async()=>{
+test('快速重复点击只发起一次检查，不重复调用服务',{timeout:5000},async()=>{
  let calls=0,resolve;const t=await setup({phase:'sentence',feedbackService:req=>{calls++;return new Promise(r=>resolve=()=>r(feedbackAnswer(req)));}});
- t.nodes.get('#sentence').value='I has worda.';t.button('保存句子').onclick();const check=t.button('检查这句（DeepSeek）');check.onclick();check.onclick();await settle();assert.equal(calls,1);resolve();await settle();assert.equal(t.state().events.filter(e=>e.status==='completed').length,1);
+ t.nodes.get('#sentence').value='I has worda.';t.button('保存句子').onclick();const check=t.button('检查这句（DeepSeek）');check.onclick();check.onclick();await t.feedbackStarted;assert.equal(calls,1);resolve();await t.feedbackDone();assert.equal(t.state().events.filter(e=>e.status==='completed').length,1);
 });
-test('退出后迟到反馈不写入其他阶段，原句仍保留',async()=>{
+test('退出后迟到反馈不写入其他阶段，原句仍保留',{timeout:5000},async()=>{
  let resolve;const t=await setup({phase:'sentence',feedbackService:req=>new Promise(r=>resolve=()=>r(feedbackAnswer(req)))});
- t.nodes.get('#sentence').value='I has worda.';t.button('保存并检查（DeepSeek）').onclick();await settle();t.run("go('home')");resolve();await settle();
+ t.nodes.get('#sentence').value='I has worda.';t.button('保存并检查（DeepSeek）').onclick();await t.feedbackStarted;t.run("go('home')");resolve();await t.feedbackDone();
  assert.equal(t.state().events.filter(e=>e.status==='completed').length,0);assert.equal(t.state().events.find(e=>e.type==='sentence').value,'I has worda.');
 });
-test('反馈保存失败可仅重试保存，无需第二次外部调用',async()=>{
+test('反馈保存失败可仅重试保存，无需第二次外部调用',{timeout:5000},async()=>{
  let calls=0,resolve;const t=await setup({phase:'sentence',feedbackService:req=>{calls++;return new Promise(r=>resolve=()=>r(feedbackAnswer(req)));}});
- t.nodes.get('#sentence').value='I has worda.';t.button('保存并检查（DeepSeek）').onclick();await settle();t.run("const restoreStore=localStorage.setItem;localStorage.setItem=()=>{throw Error('full')}");resolve();await settle();
+ t.nodes.get('#sentence').value='I has worda.';t.button('保存并检查（DeepSeek）').onclick();await t.feedbackStarted;t.run("const restoreStore=localStorage.setItem;localStorage.setItem=()=>{throw Error('full')}");resolve();await t.feedbackDone();
  assert(t.button('重试保存反馈'));assert.equal(t.state().events.filter(e=>e.status==='completed').length,0);t.run('localStorage.setItem=restoreStore');t.button('重试保存反馈').onclick();assert.equal(calls,1);assert.equal(t.state().events.at(-1).status,'completed');
 });
-test('超过检查长度仍保存原句并保留修改和继续入口，不调用模型',async()=>{
+test('超过检查长度仍保存原句并保留修改和继续入口，不调用模型',{timeout:5000},async()=>{
  let calls=0;const t=await setup({phase:'sentence',feedbackService:async req=>{calls++;return feedbackAnswer(req)}});
- t.nodes.get('#sentence').value='a'.repeat(501);t.button('保存并检查（DeepSeek）').onclick();await settle();
+ t.nodes.get('#sentence').value='a'.repeat(501);t.button('保存并检查（DeepSeek）').onclick();await t.feedbackDone();
  assert.equal(calls,0);assert.equal(t.state().events.find(e=>e.type==='sentence').value.length,501);assert(t.button('修改我的句子'));assert(t.button('下一步'));assert(t.element(n=>n.textContent.includes('超过500')));
 });
-test('服务暂不可用仍能查看已保存反馈，不展示外部检查按钮',async()=>{
+test('服务暂不可用仍能查看已保存反馈，不展示外部检查按钮',{timeout:5000},async()=>{
  const t=await setup({phase:'sentence',feedbackService:async req=>feedbackAnswer(req)});
- t.nodes.get('#sentence').value='I has worda.';t.button('保存并检查（DeepSeek）').onclick();await settle();t.run('feedbackReady=false;render()');
+ t.nodes.get('#sentence').value='I has worda.';t.button('保存并检查（DeepSeek）').onclick();await t.feedbackDone();t.run('feedbackReady=false;render()');
  assert(t.element(n=>n.textContent==='修改建议'));assert.equal(t.button('再次检查这句'),undefined);assert(t.button('下一步'));
 });
