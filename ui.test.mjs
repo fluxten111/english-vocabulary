@@ -24,9 +24,9 @@ async function setup({phase='sound',secondMissing=false,lookup,mediaDevices,medi
     insertAdjacentHTML(pos,text){if(text.includes('id="spelling"'))nodes.set('#spelling',make('#spelling'));if(text.includes('id="sentence"'))nodes.set('#sentence',make('#sentence'));},
   }};
   const document={hidden:false,addEventListener(){},createTextNode(text){return {textContent:text}},querySelector(key){if(key==='#sentenceFeedback'){const find=n=>n.id==='sentenceFeedback'?n:(n.children||[]).map(find).find(Boolean);return [...nodes.values()].map(find).find(Boolean)||null;}if(['#spelling','#sentence','#resumePrepared'].includes(key))return nodes.get(key)||null;if(!nodes.has(key))nodes.set(key,make(key));return nodes.get(key)},querySelectorAll(){return[]},createElement(){return make('button')}};
-  let reportStarted;const feedbackStarted=new Promise(resolve=>reportStarted=resolve);
+  let feedbackHashCalls=0,reportStarted;const feedbackStarted=new Promise(resolve=>reportStarted=resolve);
   const mockFetch=async(url,options)=>{if(url.endsWith('/health'))return new Response(JSON.stringify({configured:true,qualityApproved:true}));const pending=feedbackService(JSON.parse(options.body),options);reportStarted();return new Response(JSON.stringify(await pending));};
-  const ctx=vm.createContext({...core,...content,...feedback,sentenceFeedbackConfig:{enabled:!!feedbackService,apiBase:feedbackService?'https://feedback.test':''},createFeedbackClient:options=>feedback.createFeedbackClient({...options,fetcher:mockFetch}),fetch:mockFetch,feedbackRequest:async(...args)=>{if(feedbackService)await new Promise(resolve=>setTimeout(resolve,20));return feedback.feedbackRequest(...args);},AbortController,console,document,structuredClone,
+  const ctx=vm.createContext({...core,...content,...feedback,sentenceFeedbackConfig:{enabled:!!feedbackService,apiBase:feedbackService?'https://feedback.test':''},createFeedbackClient:options=>feedback.createFeedbackClient({...options,fetcher:mockFetch}),fetch:mockFetch,feedbackRequest:async(...args)=>{if(feedbackService)await new Promise(resolve=>setTimeout(resolve,++feedbackHashCalls===1?20:100));return feedback.feedbackRequest(...args);},AbortController,console,document,structuredClone,
     checkReviewedContent:async(...args)=>{if(auditDelayMs)await new Promise(resolve=>setTimeout(resolve,auditDelayMs));return content.checkReviewedContent(...args)},
     localStorage:{getItem:()=>stored,setItem:(k,v)=>stored=v},location:{hash:'#home'},
     window:{addEventListener(){},scrollTo(){}},URL,Blob,setTimeout,clearTimeout,setInterval:()=>0,
@@ -127,8 +127,8 @@ test('可选真实接口路径先保存原句，再独立保存反馈并保留�
  const events=t.state().events;assert.equal(events.find(e=>e.type==='sentence').value,'I has worda.');assert.equal(events.at(-1).status,'completed');assert(t.button('下一步'));assert(t.element(n=>n.textContent==='修改建议'));
 });
 test('快速重复点击只发起一次检查，不重复调用服务',{timeout:5000},async()=>{
- let calls=0,resolve;const t=await setup({phase:'sentence',feedbackService:req=>{calls++;return new Promise(r=>resolve=()=>r(feedbackAnswer(req)));}});
- t.nodes.get('#sentence').value='I has worda.';t.button('保存句子').onclick();const check=t.button('检查这句（DeepSeek）');check.onclick();check.onclick();await t.feedbackStarted;assert.equal(calls,1);resolve();await t.feedbackDone();assert.equal(t.state().events.filter(e=>e.status==='completed').length,1);
+ let calls=0,resolve;const t=await setup({phase:'sentence',feedbackService:req=>{calls++;return calls===1?new Promise(r=>resolve=()=>r(feedbackAnswer(req))):Promise.resolve(feedbackAnswer(req));}});
+ t.nodes.get('#sentence').value='I has worda.';t.button('保存句子').onclick();const check=t.button('检查这句（DeepSeek）');check.onclick();check.onclick();await t.feedbackStarted;assert.equal(calls,1);resolve();await t.feedbackDone();assert.equal(calls,1);assert.equal(t.state().events.filter(e=>e.status==='completed').length,1);
 });
 test('退出后迟到反馈不写入其他阶段，原句仍保留',{timeout:5000},async()=>{
  let resolve;const t=await setup({phase:'sentence',feedbackService:req=>new Promise(r=>resolve=()=>r(feedbackAnswer(req)))});

@@ -169,7 +169,7 @@ function soundHints(content,controls,w){
   }
 }
 const feedbackClient=createFeedbackClient({apiBase:sentenceFeedbackConfig.apiBase});
-let feedbackReady=false,feedbackAttach=null,feedbackJob=null,feedbackUnsaved=null;
+let feedbackReady=false,feedbackPreparing=false,feedbackAttach=null,feedbackJob=null,feedbackUnsaved=null;
 const sameAttempt=(a,b)=>a&&b&&['sessionId','wordId','phase','group','index','senseId','restarts','attempt'].every(k=>a[k]===b[k]);
 function cancelFeedback(){if(feedbackJob){feedbackJob.controller.abort();feedbackJob=null;}feedbackUnsaved=null;}
 function feedbackIsCurrent(job){
@@ -177,9 +177,10 @@ function feedbackIsCurrent(job){
   return feedbackJob===job&&sameAttempt(currentPosition(),job.owner)&&s&&latestSentenceEvent(db,s)?.id===job.request.attemptEventId;
 }
 async function checkSentence(event,word,panel){
-  if(feedbackJob||!feedbackReady)return;
+  if(feedbackPreparing||feedbackJob||!feedbackReady)return;
+  feedbackPreparing=true;
   let request;
-  try{request=await feedbackRequest(event,word);}catch(e){paintSentenceFeedback(panel);const message=document.createElement('p');message.textContent=e.message;panel.append(message);return;}
+  try{request=await feedbackRequest(event,word);}catch(e){paintSentenceFeedback(panel);const message=document.createElement('p');message.textContent=e.message;panel.append(message);return;}finally{feedbackPreparing=false;}
   if(feedbackJob||!feedbackReady)return;
   const owner=currentPosition(),s=db.sessions.find(x=>x.id===owner?.sessionId);
   if(!s||latestSentenceEvent(db,s)?.id!==event.id)return;
