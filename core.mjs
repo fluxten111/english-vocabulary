@@ -1,10 +1,28 @@
-import {validateFeedbackResponse} from './sentence-feedback.mjs?v=20261029-opt-final';
+import {validateFeedbackResponse} from './sentence-feedback.mjs?v=20261031-rfix-final2';
 export const norm=s=>s.trim().toLowerCase().replace(/[’]/g,"'").replace(/\s+/g,' ');
 export const id=()=>crypto.randomUUID();
 export const fresh=()=>({schema:1,revision:0,words:[],batches:[],sessions:[],events:[]});
 export function parse(raw){const words=[],duplicates=[],invalid=[];const seen=new Set;for(const token of raw.split(/[\n,;，；\t]+/)){const s=token.trim();if(!s)continue;if(!/^[a-zA-Z]+(?:[ '\-’][a-zA-Z]+)*$/.test(s)){invalid.push(s);continue}const n=norm(s);if(seen.has(n))duplicates.push(s);else{seen.add(n);words.push(s)}}return{words,duplicates,invalid}}
 export function createBatch(db,raw,name,skipExisting=false){const p=parse(raw);const wordIds=[];for(const surface of p.words){let w=db.words.find(w=>w.normalized===norm(surface));if(w&&skipExisting)continue;if(!w){w={id:id(),surface,normalized:norm(surface),content:null};db.words.push(w)}wordIds.push(w.id)}if(!wordIds.length)throw Error('没有可建立批次的词。');const b={id:id(),name:name||'我的词表',originalInput:raw,wordIds,createdAt:new Date().toISOString(),completedAt:null};db.batches.push(b);db.sessions.push(session(b));return b}
 export function session(b,replay=false){return{id:id(),batchId:b.id,replay,status:'new',group:0,phase:'sound',index:0,queue:[],weak:[],revealed:false,said:false,listened:false,answer:'',startedAt:null,completedAt:null,restarts:0,attempt:0}}
+const studyActions=new Set(['next','said','listened','assess','spell','sentence','sentenceRevision','hint','chinese','retry','rerecord']);
+const timestamp=value=>typeof value==='string'&&Number.isFinite(Date.parse(value))?Date.parse(value):0;
+export function selectContinueSession(db){
+  const times=new Map();
+  for(const e of db.events)if(studyActions.has(e.type))times.set(e.sessionId,Math.max(times.get(e.sessionId)||0,timestamp(e.at)));
+  const ranked=db.sessions.map((s,i)=>({s,i,time:Math.max(times.get(s.id)||0,timestamp(s.startedAt))}));
+  const latest=ranked.reduce((max,x)=>Math.max(max,x.time),0);
+  const pending=ranked.filter(x=>x.s.status!=='completed').sort((a,b)=>b.time-a.time||b.i-a.i)[0];
+  if(!pending)return null;
+  return{session:pending.s,label:pending.time&&pending.time===latest?'接着上次学':pending.s.status==='new'?'准备开始':'继续未完成'};
+}
+export function getOrCreateReplay(db,batchId,newRound=false){
+  const b=db.batches.find(x=>x.id===batchId);
+  if(!b?.completedAt)throw Error('请先完成这份词表的首次学习。');
+  const pending=db.sessions.filter(s=>s.batchId===batchId&&s.replay&&s.status!=='completed');
+  if(!newRound&&pending.length){const selected=selectContinueSession({...db,sessions:pending});return{session:selected.session,created:false};}
+  const next=session(b,true);db.sessions.push(next);return{session:next,created:true};
+}
 export const groupWords=(db,s)=>db.batches.find(b=>b.id===s.batchId).wordIds.slice(s.group*10,s.group*10+10);
 export const currentId=(db,s)=>s.phase.endsWith('Retry')?s.queue[s.index]:groupWords(db,s)[s.index];
 const isText = (v, max = 20000) => typeof v === 'string' && v.length <= max;
@@ -29,6 +47,14 @@ export function validateContent(c) {
     }
     if (c.audio.url && !secureUrl(c.audio.url)) throw Error('录音网址必须为有效的 HTTPS 网址。');
     if (c.audio.accent && !['US','UK'].includes(c.audio.accent)) throw Error('录音口音标记损坏。');
+  }
+  if(c.visual!==undefined&&c.visual!==null){
+    const v=c.visual;
+    if(typeof v!=='object'||Array.isArray(v)||v.kind!=='image'||v.senseId!==c.senseId||
+      !/^(?:assets\/)?meaning-[a-z0-9-]+\.(jpg|jpeg|png|webp)$/.test(v.src||'')||
+      !['alt','author','license','changes','reviewedAt'].every(k=>isText(v[k],3000)&&v[k])||
+      !secureUrl(v.sourcePage)||!secureUrl(v.licenseUrl)||!Number.isFinite(Date.parse(v.reviewedAt)))
+      throw Error('图片来源或词义核对信息损坏。');
   }
 }
 export function ready(w, phase) {

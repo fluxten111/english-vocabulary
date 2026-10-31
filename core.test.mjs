@@ -16,3 +16,21 @@ test('手动再练保留首次完成时间与历史',()=>{const d=fixture(1),b=d
 
 test('旧页面不得覆盖新页面的位置',()=>{const st=store(),d=fresh();transaction(st,d,c=>createBatch(c,'apple','one'));assert.throws(()=>transaction(st,d,c=>createBatch(c,'pear','two')));assert.equal(JSON.parse(st.text).batches.length,1)});
 test('未保存或跳过造句不能前进',()=>{const d=fixture(1),s=d.sessions[0];s.phase='sentence';assert.throws(()=>act(d,s.id,'next'));act(d,s.id,'sentence','');act(d,s.id,'next');assert.equal(s.phase,'spell')});
+
+test('受控30词批次第29词在五个阶段序列化恢复，阶段、词及历史保持一致',()=>{
+ let db=fresh();const words=Array.from({length:30},(_,i)=>'term'+String.fromCharCode(97+Math.floor(i/26))+String.fromCharCode(97+i%26));createBatch(db,words.join(','),'TEST ONLY 30-word structure');
+ for(const w of db.words)w.content={checked:true,senseId:'TEST ONLY',cue:'A controlled test cue.',audio:{kind:'dictionary',url:'https://example.invalid/test.mp3',source:'TEST ONLY',accent:'US',license:'TEST ONLY'},ipa:'test',ipaAccent:'US',ipaSource:'TEST ONLY',definition:'TEST ONLY',definitionSource:'TEST ONLY',example:'TEST ONLY',exampleSource:'TEST ONLY'};
+ const seen=new Set();let steps=0;
+ while(db.sessions[0].status!=='completed'){
+  if(++steps>1000)throw Error('Unexpected loop');let s=db.sessions[0];
+  if(s.group===2&&s.index===8&&!seen.has(s.phase)){
+   const before={phase:s.phase,word:currentId(db,s),events:JSON.stringify(db.events)};db=validate(JSON.parse(JSON.stringify(db)));s=db.sessions[0];assert.equal(s.phase,before.phase);assert.equal(currentId(db,s),before.word);assert.equal(JSON.stringify(db.events),before.events);seen.add(s.phase);
+  }
+  if(s.phase==='sound'){act(db,s.id,'listened');act(db,s.id,'next');}
+  else if(s.phase==='pronounce'){act(db,s.id,'said');act(db,s.id,'listened');act(db,s.id,'assess','correct');}
+  else if(s.phase==='teach')act(db,s.id,'next');
+  else if(s.phase==='sentence'){act(db,s.id,'sentence','');act(db,s.id,'next');}
+  else{const w=db.words.find(w=>w.id===currentId(db,s));act(db,s.id,'spell',w.surface);act(db,s.id,'next');}
+ }
+ assert.deepEqual([...seen].sort(),['pronounce','sentence','sound','spell','teach']);assert.equal(db.batches[0].wordIds.length,30);assert.equal(db.sessions[0].group,2);
+});

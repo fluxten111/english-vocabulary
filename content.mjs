@@ -1,4 +1,4 @@
-import {ready, norm, validateContent} from './core.mjs?v=20261028-learning-entry';
+import {ready, norm, validateContent} from './core.mjs?v=20261031-rfix-final2';
 export const MAX_WAIT_MS = 150000;
 export const REQUEST_WAIT_MS = 15000;
 export class PreparationError extends Error {
@@ -43,6 +43,18 @@ export async function checkReviewedContent(word, content, reviews) {
   if (!ready({...word,content},'sound') || !ready({...word,content},'teach'))
     throw fail('INVALID_RESPONSE','已核对内容仍有必要字段缺失。');
   return content;
+}
+// Only an explicitly superseded, intact review may be upgraded automatically.
+// Return data, never mutate a user's word or its saved learning events here.
+export async function reviewedUpgrade(word, lessons, reviews) {
+  const old=word?.content,target=lessons[word?.normalized];
+  if(!old||!target||canonical(old)===canonical(target))return null;
+  if(old.entryId!==target.entryId||old.senseId!==target.senseId||old.audio?.accent!==target.audio?.accent||old.audio?.id!==target.audio?.id)return null;
+  const record=reviews.find(r=>r.id===target.reviewId&&r.version===target.reviewVersion);
+  if(!record?.supersedes?.some(r=>r.id===old.reviewId&&r.version===old.reviewVersion))return null;
+  try{await checkReviewedContent(word,old,reviews);await checkReviewedContent(word,target,reviews);}
+  catch{return null;}
+  return structuredClone(target);
 }
 export async function validatePreparedResponse(word, response, requestId, reviews) {
   if (!response || response.schema !== 1 || response.requestId !== requestId ||

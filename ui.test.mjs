@@ -150,3 +150,24 @@ test('服务暂不可用仍能查看已保存反馈，不展示外部检查按�
  t.nodes.get('#sentence').value='I has worda.';t.button('保存并检查（DeepSeek）').onclick();await t.feedbackDone();t.run('feedbackReady=false;render()');
  assert(t.element(n=>n.textContent==='修改建议'));assert.equal(t.button('再次检查这句'),undefined);assert(t.button('下一步'));
 });
+
+test('已保存的核对旧内容在空闲时升级，位置、原句和历史不变',async()=>{
+ const t=await setup({phase:'spell'});const old=t.state(),c=old.words[0].content;
+ const next={...c,reviewId:'new-reviewed-worda',reviewVersion:'2',definition:'A simple meaning.'};
+ t.reviews.push({...t.reviews[0],id:next.reviewId,version:'2',digest:await content.contentDigest(next),supersedes:[{id:c.reviewId,version:c.reviewVersion}]});
+ t.ctx.reviewedLessons.worda=next;t.run('active=null');await t.run('auditStoredContent()');
+ const after=t.state();assert.equal(after.words[0].content.reviewVersion,'2');assert.deepEqual(after.sessions,old.sessions);assert.deepEqual(after.events,old.events);assert.equal(after.words[0].id,old.words[0].id);
+});
+test('当前卡片升级推迟到离开，绝不重画未提交默写',async()=>{
+ const t=await setup({phase:'spell'});const c=t.state().words[0].content,next={...c,reviewId:'new-reviewed-worda',reviewVersion:'2',definition:'A simple meaning.'};
+ t.reviews.push({...t.reviews[0],id:next.reviewId,version:'2',digest:await content.contentDigest(next),supersedes:[{id:c.reviewId,version:c.reviewVersion}]});t.ctx.reviewedLessons.worda=next;
+ t.nodes.get('#spelling').value='unsaved input';const writes=t.rootWrites;await t.run('auditStoredContent()');
+ assert.equal(t.state().words[0].content.reviewVersion,'1');assert.equal(t.rootWrites,writes);assert.equal(t.nodes.get('#spelling').value,'unsaved input');
+ t.run("go('home')");assert.equal(t.state().words[0].content.reviewVersion,'2');
+});
+test('摘要不匹配的既有内容不会被启动准备静默覆盖',async()=>{
+ const t=await setup();t.run("db.words[0].content.definition='Unrecognized local edit'");await t.run('auditStoredContent()');assert.equal(t.state().words[0].content.definition,'Unrecognized local edit');
+});
+test('混合批次准备空内容时也不覆盖另一词的未知本地修改',async()=>{
+ const t=await setup({secondMissing:true});t.ctx.reviewedLessons.wordb=t.contents[1];t.run("db.words[0].content.definition='Unrecognized edit';db.words[1].content=null;checkedContent.clear()");await t.run('auditStoredContent()');assert.equal(t.state().words[0].content.definition,'Unrecognized edit');assert.equal(t.state().words[1].content.senseId,'wordb#1');
+});

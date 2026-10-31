@@ -1,13 +1,12 @@
-// Real manually checked pronunciation metadata; teaching text is original, not copied dictionary text.
-// Never add unverified entries or API keys. Digests bind each lesson to its exact sense and sources.
-export const reviewedLessons = Object.freeze({
+// Reviewed content versions retained for old backups; no keys.
+export const reviewedLessons=Object.freeze({
   "apple": {
     "checked": true,
     "entryId": "apple",
     "senseId": "apple#path:0.0.0",
-    "reviewId": "v01-apple-20261028",
-    "reviewVersion": "2026-10-28.1",
-    "cue": "A red, round fruit is in a lunchbox. Its inside is white and crisp.",
+    "reviewId": "v01-apple-20261031-rfix",
+    "reviewVersion": "2026-10-31.2",
+    "cue": "A round fruit. It can be red, green, or yellow.",
     "audio": {
       "kind": "dictionary",
       "id": "apple001",
@@ -19,24 +18,36 @@ export const reviewedLessons = Object.freeze({
     "ipa": "ˈæpəl",
     "ipaAccent": "US",
     "ipaSource": "Merriam-Webster Learner’s Dictionary · apple#path:0.0.0",
-    "definition": "A fruit with a crisp center and thin red, green, or yellow skin.",
+    "definition": "A round fruit that can be red, green, or yellow.",
     "definitionSource": "词间原创 · 已对照所选词义核对",
-    "example": "I packed an apple for our school trip.",
+    "example": "I eat an apple.",
     "exampleSource": "词间原创 · 已对照所选词义核对",
     "chinese": "苹果（水果）",
     "chineseSource": "词间编写 · 已核对所选词义",
     "partOfSpeech": "名词 · noun",
     "usage": "an apple; two apples",
     "usageSource": "词间原创 · 已对照所选词义核对",
-    "sentencePrompt": "Tell a classmate which fruit you packed for lunch."
+    "sentencePrompt": "Tell a friend which fruit you eat at lunch.",
+    "visual": {
+      "kind": "image",
+      "src": "meaning-01.jpg",
+      "senseId": "apple#path:0.0.0",
+      "alt": "A round fruit. It can be red, green, or yellow.",
+      "author": "robin_24",
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Wet_apple_isolated_on_white.jpg",
+      "changes": "原图内容未修改；以来源站缩略尺寸呈现。",
+      "reviewedAt": "2026-10-31T04:42:03.154Z"
+    }
   },
   "book": {
     "checked": true,
     "entryId": "book:1",
     "senseId": "book:1#a",
-    "reviewId": "v01-book-20261028",
-    "reviewVersion": "2026-10-28.1",
-    "cue": "You open a cover and turn the paper pages to read a story.",
+    "reviewId": "v01-book-20261031-rfix",
+    "reviewVersion": "2026-10-31.2",
+    "cue": "You open it and turn the pages to read.",
     "audio": {
       "kind": "dictionary",
       "id": "book0001",
@@ -48,24 +59,36 @@ export const reviewedLessons = Object.freeze({
     "ipa": "ˈbʊk",
     "ipaAccent": "US",
     "ipaSource": "Merriam-Webster Learner’s Dictionary · book:1#a",
-    "definition": "Pages joined inside a cover, with a story or information to read.",
+    "definition": "Pages in a cover, with words or pictures to read.",
     "definitionSource": "词间原创 · 已对照所选词义核对",
-    "example": "Please put your book on the desk after reading.",
+    "example": "My book is on the desk.",
     "exampleSource": "词间原创 · 已对照所选词义核对",
     "chinese": "书；书本（装订的纸页）",
     "chineseSource": "词间编写 · 已核对所选词义",
     "partOfSpeech": "名词 · noun",
     "usage": "read a book; a book about space",
     "usageSource": "词间原创 · 已对照所选词义核对",
-    "sentencePrompt": "Tell a friend about something you are reading."
+    "sentencePrompt": "Tell a friend where you keep something to read.",
+    "visual": {
+      "kind": "image",
+      "src": "meaning-02.jpg",
+      "senseId": "book:1#a",
+      "alt": "You open it and turn the pages to read.",
+      "author": "Ben White benwhitephotography",
+      "license": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Open_book_(Unsplash).jpg",
+      "changes": "原图内容未修改；以来源站缩略尺寸呈现。",
+      "reviewedAt": "2026-10-31T04:42:03.154Z"
+    }
   },
   "chair": {
     "checked": true,
     "entryId": "chair:1",
     "senseId": "chair:1#1",
-    "reviewId": "v01-chair-20261028",
-    "reviewVersion": "2026-10-28.1",
-    "cue": "A student sits on a seat with a back and four legs at a desk.",
+    "reviewId": "v01-chair-20261031-rfix",
+    "reviewVersion": "2026-10-31.2",
+    "cue": "A seat for one person, with a back.",
     "audio": {
       "kind": "dictionary",
       "id": "chair001",
@@ -77,24 +100,36 @@ export const reviewedLessons = Object.freeze({
     "ipa": "ˈtʃeɚ",
     "ipaAccent": "US",
     "ipaSource": "Merriam-Webster Learner’s Dictionary · chair:1#1",
-    "definition": "A seat with a back, made for one person.",
+    "definition": "A seat for one person, with a back.",
     "definitionSource": "词间原创 · 已对照所选词义核对",
-    "example": "There is an empty chair beside my desk.",
+    "example": "Please sit on this chair.",
     "exampleSource": "词间原创 · 已对照所选词义核对",
     "chinese": "椅子（供一人坐、有靠背）",
     "chineseSource": "词间编写 · 已核对所选词义",
     "partOfSpeech": "名词 · noun",
     "usage": "sit on a chair; an empty chair",
     "usageSource": "词间原创 · 已对照所选词义核对",
-    "sentencePrompt": "Help a new classmate find somewhere to sit."
+    "sentencePrompt": "Tell a friend where to sit.",
+    "visual": {
+      "kind": "image",
+      "src": "meaning-03.jpg",
+      "senseId": "chair:1#1",
+      "alt": "A seat for one person, with a back.",
+      "author": "epSos.de",
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Wooden_Chair.jpg",
+      "changes": "原图内容未修改；以来源站缩略尺寸呈现。",
+      "reviewedAt": "2026-10-31T04:42:03.154Z"
+    }
   },
   "river": {
     "checked": true,
     "entryId": "river",
     "senseId": "river#1",
-    "reviewId": "v01-river-20261028",
-    "reviewVersion": "2026-10-28.1",
-    "cue": "Water flows through the land, past a bridge, and toward the sea.",
+    "reviewId": "v01-river-20261031-rfix",
+    "reviewVersion": "2026-10-31.2",
+    "cue": "A long line of water moving across the land.",
     "audio": {
       "kind": "dictionary",
       "id": "river001",
@@ -106,24 +141,36 @@ export const reviewedLessons = Object.freeze({
     "ipa": "ˈrɪvɚ",
     "ipaAccent": "US",
     "ipaSource": "Merriam-Webster Learner’s Dictionary · river#1",
-    "definition": "A natural moving body of water that follows a path across land.",
+    "definition": "A long, natural flow of water across the land.",
     "definitionSource": "词间原创 · 已对照所选词义核对",
-    "example": "We crossed the river on a wooden bridge.",
+    "example": "We walk by the river.",
     "exampleSource": "词间原创 · 已对照所选词义核对",
     "chinese": "河；河流（自然流动的水道）",
     "chineseSource": "词间编写 · 已核对所选词义",
     "partOfSpeech": "名词 · noun",
     "usage": "cross a river; beside the river",
     "usageSource": "词间原创 · 已对照所选词义核对",
-    "sentencePrompt": "Describe a place you passed on a school trip."
+    "sentencePrompt": "Tell a friend about a place with flowing water.",
+    "visual": {
+      "kind": "image",
+      "src": "meaning-04.jpg",
+      "senseId": "river#1",
+      "alt": "A long line of water moving across the land.",
+      "author": "This Photo was taken by Timothy A. Gonsalves.  Feel free to use my photos, but please mention me as the author.  I would much appreciate if you send me an email tagooty@yahoo.com or write on my talk page, for my information.  Please contact me before commercial use.\n\n\n\nPlease do not upload an edited image here without consulting me.  I would like to make corrections only at my own source to ensure that the changes improve the image and are preserved.Otherwise you may upload an edited image with a new name. Please use one of the templates derivative or extract.",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Spiti_River_Kaza_Himachal_Jun18_D72_7232.jpg",
+      "changes": "原图内容未修改；以来源站缩略尺寸呈现。",
+      "reviewedAt": "2026-10-31T04:42:03.154Z"
+    }
   },
   "garden": {
     "checked": true,
     "entryId": "garden:1",
     "senseId": "garden:1#1",
-    "reviewId": "v01-garden-20261028",
-    "reviewVersion": "2026-10-28.1",
-    "cue": "Flowers and vegetables grow in a small area of soil beside a house.",
+    "reviewId": "v01-garden-20261031-rfix",
+    "reviewVersion": "2026-10-31.2",
+    "cue": "A place where people grow flowers or vegetables.",
     "audio": {
       "kind": "dictionary",
       "id": "garden01",
@@ -135,24 +182,36 @@ export const reviewedLessons = Object.freeze({
     "ipa": "ˈgɑɚdn̩",
     "ipaAccent": "US",
     "ipaSource": "Merriam-Webster Learner’s Dictionary · garden:1#1",
-    "definition": "A piece of ground used for growing flowers, vegetables, or other plants.",
+    "definition": "A place where people grow flowers or vegetables.",
     "definitionSource": "词间原创 · 已对照所选词义核对",
-    "example": "We grow carrots in the garden behind our house.",
+    "example": "We grow flowers in our garden.",
     "exampleSource": "词间原创 · 已对照所选词义核对",
     "chinese": "花园；菜园（种植植物的地块）",
     "chineseSource": "词间编写 · 已核对所选词义",
     "partOfSpeech": "名词 · noun",
     "usage": "in the garden; a vegetable garden",
     "usageSource": "词间原创 · 已对照所选词义核对",
-    "sentencePrompt": "Tell a friend what you would like to grow at home."
+    "sentencePrompt": "Tell a friend where you grow flowers or vegetables.",
+    "visual": {
+      "kind": "image",
+      "src": "meaning-05.jpg",
+      "senseId": "garden:1#1",
+      "alt": "A place where people grow flowers or vegetables.",
+      "author": "Jennifer C.",
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Garden_(4163921896).jpg",
+      "changes": "原图内容未修改；以来源站缩略尺寸呈现。",
+      "reviewedAt": "2026-10-31T04:42:03.154Z"
+    }
   },
   "window": {
     "checked": true,
     "entryId": "window",
     "senseId": "window#a",
-    "reviewId": "v01-window-20261028",
-    "reviewVersion": "2026-10-28.1",
-    "cue": "You look outside through glass in the wall, then open it for fresh air.",
+    "reviewId": "v01-window-20261031-rfix",
+    "reviewVersion": "2026-10-31.2",
+    "cue": "Glass in a wall lets in light. You can see outside.",
     "audio": {
       "kind": "dictionary",
       "id": "window01",
@@ -164,24 +223,36 @@ export const reviewedLessons = Object.freeze({
     "ipa": "ˈwɪndoʊ",
     "ipaAccent": "US",
     "ipaSource": "Merriam-Webster Learner’s Dictionary · window#a",
-    "definition": "A glass-covered opening in a wall that lets you see outside and lets light in.",
+    "definition": "An opening in a wall, with glass to let in light.",
     "definitionSource": "词间原创 · 已对照所选词义核对",
-    "example": "May I open the window? The classroom is warm.",
+    "example": "Please open the window.",
     "exampleSource": "词间原创 · 已对照所选词义核对",
     "chinese": "窗；窗户（墙上的采光、通风开口）",
     "chineseSource": "词间编写 · 已核对所选词义",
     "partOfSpeech": "名词 · noun",
     "usage": "open a window; look out of the window",
     "usageSource": "词间原创 · 已对照所选词义核对",
-    "sentencePrompt": "Make a polite request when your classroom feels too warm."
+    "sentencePrompt": "Ask someone to let fresh air into the room.",
+    "visual": {
+      "kind": "image",
+      "src": "meaning-06.jpg",
+      "senseId": "window#a",
+      "alt": "Glass in a wall lets in light. You can see outside.",
+      "author": "Rhododendrites",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Window_in_a_cafe_in_San_Gimignano_(02182)2.jpg",
+      "changes": "原图内容未修改；以来源站缩略尺寸呈现。",
+      "reviewedAt": "2026-10-31T04:42:03.154Z"
+    }
   },
   "pencil": {
     "checked": true,
     "entryId": "pencil:1",
     "senseId": "pencil:1#path:0.0.0",
-    "reviewId": "v01-pencil-20261028",
-    "reviewVersion": "2026-10-28.1",
-    "cue": "You write with a thin tool that has a dark center. You can erase the marks.",
+    "reviewId": "v01-pencil-20261031-rfix",
+    "reviewVersion": "2026-10-31.2",
+    "cue": "You write with it. You can rub out the marks.",
     "audio": {
       "kind": "dictionary",
       "id": "pencel01",
@@ -193,24 +264,36 @@ export const reviewedLessons = Object.freeze({
     "ipa": "ˈpɛnsəl",
     "ipaAccent": "US",
     "ipaSource": "Merriam-Webster Learner’s Dictionary · pencil:1#path:0.0.0",
-    "definition": "A writing or drawing tool whose solid center leaves marks on paper.",
+    "definition": "A tool for writing or drawing, with marks you can rub out.",
     "definitionSource": "词间原创 · 已对照所选词义核对",
-    "example": "I borrowed a pencil to finish my drawing.",
+    "example": "I write with a pencil.",
     "exampleSource": "词间原创 · 已对照所选词义核对",
     "chinese": "铅笔（可书写、绘画的工具）",
     "chineseSource": "词间编写 · 已核对所选词义",
     "partOfSpeech": "名词 · noun",
     "usage": "write in pencil; sharpen a pencil",
     "usageSource": "词间原创 · 已对照所选词义核对",
-    "sentencePrompt": "Ask a classmate to lend you something for drawing."
+    "sentencePrompt": "Tell a friend what you use to write or draw.",
+    "visual": {
+      "kind": "image",
+      "src": "meaning-07.jpg",
+      "senseId": "pencil:1#path:0.0.0",
+      "alt": "You write with it. You can rub out the marks.",
+      "author": "per from Norway",
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Pencil.jpg",
+      "changes": "原图内容未修改；以来源站缩略尺寸呈现。",
+      "reviewedAt": "2026-10-31T04:42:03.154Z"
+    }
   },
   "basket": {
     "checked": true,
     "entryId": "basket",
     "senseId": "basket#1 a",
-    "reviewId": "v01-basket-20261028",
-    "reviewVersion": "2026-10-28.1",
-    "cue": "You carry fruit in an open container woven from thin strips, with a handle.",
+    "reviewId": "v01-basket-20261031-rfix",
+    "reviewVersion": "2026-10-31.2",
+    "cue": "A container for carrying things, often with a handle.",
     "audio": {
       "kind": "dictionary",
       "id": "basket01",
@@ -222,24 +305,36 @@ export const reviewedLessons = Object.freeze({
     "ipa": "ˈbæskɪt",
     "ipaAccent": "US",
     "ipaSource": "Merriam-Webster Learner’s Dictionary · basket#1 a",
-    "definition": "A container made from strips woven together, used to hold or carry things.",
+    "definition": "A container for carrying food or other things, often with a handle.",
     "definitionSource": "词间原创 · 已对照所选词义核对",
-    "example": "We carried our picnic food in a basket.",
+    "example": "Put the fruit in the basket.",
     "exampleSource": "词间原创 · 已对照所选词义核对",
     "chinese": "篮子；筐（编织的容器）",
     "chineseSource": "词间编写 · 已核对所选词义",
     "partOfSpeech": "名词 · noun",
     "usage": "a basket of fruit; put something in a basket",
     "usageSource": "词间原创 · 已对照所选词义核对",
-    "sentencePrompt": "Describe how you carried food to a picnic."
+    "sentencePrompt": "Tell a friend where to put some fruit.",
+    "visual": {
+      "kind": "image",
+      "src": "meaning-08.jpg",
+      "senseId": "basket#1 a",
+      "alt": "A container for carrying things, often with a handle.",
+      "author": "Coyau / Wikimedia Commons",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Panier_d%27osier_01.jpg",
+      "changes": "原图内容未修改；以来源站缩略尺寸呈现。",
+      "reviewedAt": "2026-10-31T04:42:03.154Z"
+    }
   },
   "blanket": {
     "checked": true,
     "entryId": "blanket:1",
     "senseId": "blanket:1#1",
-    "reviewId": "v01-blanket-20261028",
-    "reviewVersion": "2026-10-28.1",
-    "cue": "You pull a soft, thick cover over yourself to keep warm in bed.",
+    "reviewId": "v01-blanket-20261031-rfix",
+    "reviewVersion": "2026-10-31.2",
+    "cue": "A thick cover that keeps you warm in bed.",
     "audio": {
       "kind": "dictionary",
       "id": "blanke01",
@@ -251,24 +346,36 @@ export const reviewedLessons = Object.freeze({
     "ipa": "ˈblæŋkət",
     "ipaAccent": "US",
     "ipaSource": "Merriam-Webster Learner’s Dictionary · blanket:1#1",
-    "definition": "A large cloth cover that keeps your body warm, often on a bed.",
+    "definition": "A thick cover that keeps you warm in bed.",
     "definitionSource": "词间原创 · 已对照所选词义核对",
-    "example": "I put a blanket on my bed because the night was cold.",
+    "example": "This blanket keeps me warm.",
     "exampleSource": "词间原创 · 已对照所选词义核对",
     "chinese": "毯子（保暖的布质覆盖物）",
     "chineseSource": "词间编写 · 已核对所选词义",
     "partOfSpeech": "名词 · noun",
     "usage": "a warm blanket; cover yourself with a blanket",
     "usageSource": "词间原创 · 已对照所选词义核对",
-    "sentencePrompt": "Say what you need on a cold night."
+    "sentencePrompt": "Tell a friend what keeps you warm in bed.",
+    "visual": {
+      "kind": "image",
+      "src": "meaning-09.jpg",
+      "senseId": "blanket:1#1",
+      "alt": "A thick cover that keeps you warm in bed.",
+      "author": "Hannah Clover",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Grey_knitted_blanket.jpg",
+      "changes": "原图内容未修改；以来源站缩略尺寸呈现。",
+      "reviewedAt": "2026-10-31T04:42:03.154Z"
+    }
   },
   "ticket": {
     "checked": true,
     "entryId": "ticket:1",
     "senseId": "ticket:1#1",
-    "reviewId": "v01-ticket-20261028",
-    "reviewVersion": "2026-10-28.1",
-    "cue": "You show a small paper pass at the cinema door so you can go inside.",
+    "reviewId": "v01-ticket-20261031-rfix",
+    "reviewVersion": "2026-10-31.2",
+    "cue": "A small piece of paper that lets you enter or travel.",
     "audio": {
       "kind": "dictionary",
       "id": "ticket01",
@@ -280,24 +387,36 @@ export const reviewedLessons = Object.freeze({
     "ipa": "ˈtɪkət",
     "ipaAccent": "US",
     "ipaSource": "Merriam-Webster Learner’s Dictionary · ticket:1#1",
-    "definition": "A paper or digital pass showing that you may enter an event or make a journey.",
+    "definition": "A piece of paper that lets you enter or travel.",
     "definitionSource": "词间原创 · 已对照所选词义核对",
-    "example": "Keep your ticket ready when we get on the train.",
+    "example": "Here is my bus ticket.",
     "exampleSource": "词间原创 · 已对照所选词义核对",
     "chinese": "票；入场券；车票（入场或乘车凭证）",
     "chineseSource": "词间编写 · 已核对所选词义",
     "partOfSpeech": "名词 · noun",
     "usage": "buy a ticket; a ticket for the school concert",
     "usageSource": "词间原创 · 已对照所选词义核对",
-    "sentencePrompt": "Remind a friend what to bring for a train journey."
+    "sentencePrompt": "Tell a friend what you need before getting on a bus.",
+    "visual": {
+      "kind": "image",
+      "src": "meaning-10.png",
+      "senseId": "ticket:1#1",
+      "alt": "A small piece of paper that lets you enter or travel.",
+      "author": "Sami Hult",
+      "license": "Public domain",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Ticket.svg",
+      "changes": "原图内容未修改；以来源站缩略尺寸呈现。",
+      "reviewedAt": "2026-10-31T04:42:03.154Z"
+    }
   },
   "planet": {
     "checked": true,
     "entryId": "planet",
     "senseId": "planet#1",
-    "reviewId": "v01-planet-20261028",
-    "reviewVersion": "2026-10-28.1",
-    "cue": "Earth and Mars are round worlds that travel around the Sun.",
+    "reviewId": "v01-planet-20261031-rfix",
+    "reviewVersion": "2026-10-31.2",
+    "cue": "A large, round object in space that moves around a star.",
     "audio": {
       "kind": "dictionary",
       "id": "planet01",
@@ -309,24 +428,36 @@ export const reviewedLessons = Object.freeze({
     "ipa": "ˈplænət",
     "ipaAccent": "US",
     "ipaSource": "Merriam-Webster Learner’s Dictionary · planet#1",
-    "definition": "A large, round body in space that moves around a star.",
+    "definition": "A large, round object that moves around a star.",
     "definitionSource": "词间原创 · 已对照所选词义核对",
-    "example": "Our class made a model of the planet Mars.",
+    "example": "Earth is a planet.",
     "exampleSource": "词间原创 · 已对照所选词义核对",
     "chinese": "行星（围绕恒星运行的天体）",
     "chineseSource": "词间编写 · 已核对所选词义",
     "partOfSpeech": "名词 · noun",
     "usage": "the planet Earth; another planet",
     "usageSource": "词间原创 · 已对照所选词义核对",
-    "sentencePrompt": "Say which world in our solar system you would like to learn about."
+    "sentencePrompt": "Tell a friend something about Earth or Mars.",
+    "visual": {
+      "kind": "image",
+      "src": "meaning-11.jpg",
+      "senseId": "planet#1",
+      "alt": "A large, round object in space that moves around a star.",
+      "author": "NASA/JPL/USGS",
+      "license": "Public domain",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Jupiter.jpg",
+      "changes": "原图内容未修改；以来源站缩略尺寸呈现。",
+      "reviewedAt": "2026-10-31T04:42:03.154Z"
+    }
   },
   "orange": {
     "checked": true,
     "entryId": "orange",
     "senseId": "orange#1",
-    "reviewId": "v01-orange-20261028",
-    "reviewVersion": "2026-10-28.1",
-    "cue": "You peel a round citrus fruit and pull its juicy sections apart.",
+    "reviewId": "v01-orange-20261031-rfix",
+    "reviewVersion": "2026-10-31.2",
+    "cue": "A round fruit with a thick skin and a sweet, juicy inside.",
     "audio": {
       "kind": "dictionary",
       "id": "orange01",
@@ -338,24 +469,36 @@ export const reviewedLessons = Object.freeze({
     "ipa": "ˈɑrɪnʤ",
     "ipaAccent": "US",
     "ipaSource": "Merriam-Webster Learner’s Dictionary · orange#1",
-    "definition": "A round citrus fruit with a thick skin and juicy sections inside.",
+    "definition": "A round, juicy fruit with a thick skin.",
     "definitionSource": "词间原创 · 已对照所选词义核对",
-    "example": "I shared an orange with my friend after football practice.",
+    "example": "I eat an orange after lunch.",
     "exampleSource": "词间原创 · 已对照所选词义核对",
     "chinese": "橙子（柑橘类水果）",
     "chineseSource": "词间编写 · 已核对所选词义",
     "partOfSpeech": "名词 · noun",
     "usage": "peel an orange; a glass of orange juice",
     "usageSource": "词间原创 · 已对照所选词义核对",
-    "sentencePrompt": "Describe a piece of fruit you shared after sport."
+    "sentencePrompt": "Tell a friend about a fruit you eat after lunch.",
+    "visual": {
+      "kind": "image",
+      "src": "meaning-12.jpg",
+      "senseId": "orange#1",
+      "alt": "A round fruit with a thick skin and a sweet, juicy inside.",
+      "author": "Evan-Amos",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Orange-Whole-%26-Split.jpg",
+      "changes": "原图内容未修改；以来源站缩略尺寸呈现。",
+      "reviewedAt": "2026-10-31T04:42:03.154Z"
+    }
   },
   "pear": {
     "checked": true,
     "entryId": "pear",
     "senseId": "pear#path:0.0.0",
-    "reviewId": "v01-pear-20261028",
-    "reviewVersion": "2026-10-28.1",
-    "cue": "A sweet fruit is narrow near its stem and wider and rounder at the bottom.",
+    "reviewId": "v01-pear-20261031-rfix",
+    "reviewVersion": "2026-10-31.2",
+    "cue": "A sweet fruit, wide at the bottom and narrow at the top.",
     "audio": {
       "kind": "dictionary",
       "id": "pear0001",
@@ -367,19 +510,31 @@ export const reviewedLessons = Object.freeze({
     "ipa": "ˈpeɚ",
     "ipaAccent": "US",
     "ipaSource": "Merriam-Webster Learner’s Dictionary · pear#path:0.0.0",
-    "definition": "A sweet fruit with a narrow top and a rounded, wider bottom.",
+    "definition": "A sweet fruit with a wide bottom and a narrow top.",
     "definitionSource": "词间原创 · 已对照所选词义核对",
-    "example": "I cut a pear into small pieces for my snack.",
+    "example": "I eat a pear for a snack.",
     "exampleSource": "词间原创 · 已对照所选词义核对",
     "chinese": "梨（上窄下宽的水果）",
     "chineseSource": "词间编写 · 已核对所选词义",
     "partOfSpeech": "名词 · noun",
     "usage": "a ripe pear; two pears",
     "usageSource": "词间原创 · 已对照所选词义核对",
-    "sentencePrompt": "Tell someone how you prepared fruit for a snack."
+    "sentencePrompt": "Tell a friend which fruit you have for a snack.",
+    "visual": {
+      "kind": "image",
+      "src": "meaning-13.jpg",
+      "senseId": "pear#path:0.0.0",
+      "alt": "A sweet fruit, wide at the bottom and narrow at the top.",
+      "author": "MartinThoma",
+      "license": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Pear-2.jpg",
+      "changes": "原图内容未修改；以来源站缩略尺寸呈现。",
+      "reviewedAt": "2026-10-31T04:42:03.154Z"
+    }
   }
 });
-export const reviewedContent = Object.freeze([
+export const reviewedContent=Object.freeze([
   {
     "id": "v01-apple-20261028",
     "version": "2026-10-28.1",
@@ -651,6 +806,422 @@ export const reviewedContent = Object.freeze([
       "audioHTTP": 206,
       "type": "audio/mpeg",
       "bytesRead": 512
+    }
+  },
+  {
+    "id": "v01-apple-20261031-rfix",
+    "version": "2026-10-31.2",
+    "normalizedForm": "apple",
+    "provider": "merriam-webster/learners",
+    "entryId": "apple",
+    "senseId": "apple#path:0.0.0",
+    "accent": "US",
+    "audioId": "apple001",
+    "reviewedBy": "Codex · 逐词对照真实词条、音标与原站录音",
+    "reviewedAt": "2026-10-31T04:42:03.154Z",
+    "digest": "72235604b2f257249bcf2e63a08b82c0049d52e08b4dc01114c25ad2a9256f4c",
+    "textOrigin": "Original teaching text; no copied dictionary definitions or examples.",
+    "audioSourceURL": "https://dictionaryapi.com/products/api-learners-dictionary",
+    "pronunciationChecked": {
+      "dictionaryHTTP": 200,
+      "audioHTTP": 206,
+      "type": "audio/mpeg",
+      "bytesRead": 512
+    },
+    "supersedes": [
+      {
+        "id": "v01-apple-20261028",
+        "version": "2026-10-28.1"
+      }
+    ],
+    "textReview": "Simplified original English; same selected sense, pronunciation and accent.",
+    "visualReview": {
+      "approved": true,
+      "note": "逐图目视核对目标词义，画面不包含目标拼写；来源许可已核对。"
+    }
+  },
+  {
+    "id": "v01-book-20261031-rfix",
+    "version": "2026-10-31.2",
+    "normalizedForm": "book",
+    "provider": "merriam-webster/learners",
+    "entryId": "book:1",
+    "senseId": "book:1#a",
+    "accent": "US",
+    "audioId": "book0001",
+    "reviewedBy": "Codex · 逐词对照真实词条、音标与原站录音",
+    "reviewedAt": "2026-10-31T04:42:03.154Z",
+    "digest": "e1d20300fff96af41100c113ad812fe214c24312d68f5064cfc5862bf6384d0b",
+    "textOrigin": "Original teaching text; no copied dictionary definitions or examples.",
+    "audioSourceURL": "https://dictionaryapi.com/products/api-learners-dictionary",
+    "pronunciationChecked": {
+      "dictionaryHTTP": 200,
+      "audioHTTP": 206,
+      "type": "audio/mpeg",
+      "bytesRead": 512
+    },
+    "supersedes": [
+      {
+        "id": "v01-book-20261028",
+        "version": "2026-10-28.1"
+      }
+    ],
+    "textReview": "Simplified original English; same selected sense, pronunciation and accent.",
+    "visualReview": {
+      "approved": true,
+      "note": "逐图目视核对目标词义，画面不包含目标拼写；来源许可已核对。"
+    }
+  },
+  {
+    "id": "v01-chair-20261031-rfix",
+    "version": "2026-10-31.2",
+    "normalizedForm": "chair",
+    "provider": "merriam-webster/learners",
+    "entryId": "chair:1",
+    "senseId": "chair:1#1",
+    "accent": "US",
+    "audioId": "chair001",
+    "reviewedBy": "Codex · 逐词对照真实词条、音标与原站录音",
+    "reviewedAt": "2026-10-31T04:42:03.154Z",
+    "digest": "214ac94892c16eb29e9cb64bf9c405585340cbbfddcef4195d62b5fb66463665",
+    "textOrigin": "Original teaching text; no copied dictionary definitions or examples.",
+    "audioSourceURL": "https://dictionaryapi.com/products/api-learners-dictionary",
+    "pronunciationChecked": {
+      "dictionaryHTTP": 200,
+      "audioHTTP": 206,
+      "type": "audio/mpeg",
+      "bytesRead": 512
+    },
+    "supersedes": [
+      {
+        "id": "v01-chair-20261028",
+        "version": "2026-10-28.1"
+      }
+    ],
+    "textReview": "Simplified original English; same selected sense, pronunciation and accent.",
+    "visualReview": {
+      "approved": true,
+      "note": "逐图目视核对目标词义，画面不包含目标拼写；来源许可已核对。"
+    }
+  },
+  {
+    "id": "v01-river-20261031-rfix",
+    "version": "2026-10-31.2",
+    "normalizedForm": "river",
+    "provider": "merriam-webster/learners",
+    "entryId": "river",
+    "senseId": "river#1",
+    "accent": "US",
+    "audioId": "river001",
+    "reviewedBy": "Codex · 逐词对照真实词条、音标与原站录音",
+    "reviewedAt": "2026-10-31T04:42:03.154Z",
+    "digest": "9bcbbc54c093ad85b659b6fc42909438740c2c302dac8a0d5418600cad2129b7",
+    "textOrigin": "Original teaching text; no copied dictionary definitions or examples.",
+    "audioSourceURL": "https://dictionaryapi.com/products/api-learners-dictionary",
+    "pronunciationChecked": {
+      "dictionaryHTTP": 200,
+      "audioHTTP": 206,
+      "type": "audio/mpeg",
+      "bytesRead": 512
+    },
+    "supersedes": [
+      {
+        "id": "v01-river-20261028",
+        "version": "2026-10-28.1"
+      }
+    ],
+    "textReview": "Simplified original English; same selected sense, pronunciation and accent.",
+    "visualReview": {
+      "approved": true,
+      "note": "逐图目视核对目标词义，画面不包含目标拼写；来源许可已核对。"
+    }
+  },
+  {
+    "id": "v01-garden-20261031-rfix",
+    "version": "2026-10-31.2",
+    "normalizedForm": "garden",
+    "provider": "merriam-webster/learners",
+    "entryId": "garden:1",
+    "senseId": "garden:1#1",
+    "accent": "US",
+    "audioId": "garden01",
+    "reviewedBy": "Codex · 逐词对照真实词条、音标与原站录音",
+    "reviewedAt": "2026-10-31T04:42:03.154Z",
+    "digest": "c8be6d12449a592b23ed9c6f3d4a4b58cf0785234db2a7fc957d68c845f3c0c0",
+    "textOrigin": "Original teaching text; no copied dictionary definitions or examples.",
+    "audioSourceURL": "https://dictionaryapi.com/products/api-learners-dictionary",
+    "pronunciationChecked": {
+      "dictionaryHTTP": 200,
+      "audioHTTP": 206,
+      "type": "audio/mpeg",
+      "bytesRead": 512
+    },
+    "supersedes": [
+      {
+        "id": "v01-garden-20261028",
+        "version": "2026-10-28.1"
+      }
+    ],
+    "textReview": "Simplified original English; same selected sense, pronunciation and accent.",
+    "visualReview": {
+      "approved": true,
+      "note": "逐图目视核对目标词义，画面不包含目标拼写；来源许可已核对。"
+    }
+  },
+  {
+    "id": "v01-window-20261031-rfix",
+    "version": "2026-10-31.2",
+    "normalizedForm": "window",
+    "provider": "merriam-webster/learners",
+    "entryId": "window",
+    "senseId": "window#a",
+    "accent": "US",
+    "audioId": "window01",
+    "reviewedBy": "Codex · 逐词对照真实词条、音标与原站录音",
+    "reviewedAt": "2026-10-31T04:42:03.154Z",
+    "digest": "4e735ec8063105aaf538333840369e0ea1b6b204c36b6be8b4e6f0d4100fefbf",
+    "textOrigin": "Original teaching text; no copied dictionary definitions or examples.",
+    "audioSourceURL": "https://dictionaryapi.com/products/api-learners-dictionary",
+    "pronunciationChecked": {
+      "dictionaryHTTP": 200,
+      "audioHTTP": 206,
+      "type": "audio/mpeg",
+      "bytesRead": 512
+    },
+    "supersedes": [
+      {
+        "id": "v01-window-20261028",
+        "version": "2026-10-28.1"
+      }
+    ],
+    "textReview": "Simplified original English; same selected sense, pronunciation and accent.",
+    "visualReview": {
+      "approved": true,
+      "note": "逐图目视核对目标词义，画面不包含目标拼写；来源许可已核对。"
+    }
+  },
+  {
+    "id": "v01-pencil-20261031-rfix",
+    "version": "2026-10-31.2",
+    "normalizedForm": "pencil",
+    "provider": "merriam-webster/learners",
+    "entryId": "pencil:1",
+    "senseId": "pencil:1#path:0.0.0",
+    "accent": "US",
+    "audioId": "pencel01",
+    "reviewedBy": "Codex · 逐词对照真实词条、音标与原站录音",
+    "reviewedAt": "2026-10-31T04:42:03.154Z",
+    "digest": "7c0b7c8bf3aa48304de5f7845fd5fa75e9d229c03af40df09fa34bfdf9eaa653",
+    "textOrigin": "Original teaching text; no copied dictionary definitions or examples.",
+    "audioSourceURL": "https://dictionaryapi.com/products/api-learners-dictionary",
+    "pronunciationChecked": {
+      "dictionaryHTTP": 200,
+      "audioHTTP": 206,
+      "type": "audio/mpeg",
+      "bytesRead": 512
+    },
+    "supersedes": [
+      {
+        "id": "v01-pencil-20261028",
+        "version": "2026-10-28.1"
+      }
+    ],
+    "textReview": "Simplified original English; same selected sense, pronunciation and accent.",
+    "visualReview": {
+      "approved": true,
+      "note": "逐图目视核对目标词义，画面不包含目标拼写；来源许可已核对。"
+    }
+  },
+  {
+    "id": "v01-basket-20261031-rfix",
+    "version": "2026-10-31.2",
+    "normalizedForm": "basket",
+    "provider": "merriam-webster/learners",
+    "entryId": "basket",
+    "senseId": "basket#1 a",
+    "accent": "US",
+    "audioId": "basket01",
+    "reviewedBy": "Codex · 逐词对照真实词条、音标与原站录音",
+    "reviewedAt": "2026-10-31T04:42:03.154Z",
+    "digest": "19fe08c6d9a4dd8749553b00d445ecee66c25350e918cd04c126abf9f83c3ae0",
+    "textOrigin": "Original teaching text; no copied dictionary definitions or examples.",
+    "audioSourceURL": "https://dictionaryapi.com/products/api-learners-dictionary",
+    "pronunciationChecked": {
+      "dictionaryHTTP": 200,
+      "audioHTTP": 206,
+      "type": "audio/mpeg",
+      "bytesRead": 512
+    },
+    "supersedes": [
+      {
+        "id": "v01-basket-20261028",
+        "version": "2026-10-28.1"
+      }
+    ],
+    "textReview": "Simplified original English; same selected sense, pronunciation and accent.",
+    "visualReview": {
+      "approved": true,
+      "note": "目视核对带提手的空编织篮，非篮球框；采用来源要求署名Coyau / Wikimedia Commons。"
+    }
+  },
+  {
+    "id": "v01-blanket-20261031-rfix",
+    "version": "2026-10-31.2",
+    "normalizedForm": "blanket",
+    "provider": "merriam-webster/learners",
+    "entryId": "blanket:1",
+    "senseId": "blanket:1#1",
+    "accent": "US",
+    "audioId": "blanke01",
+    "reviewedBy": "Codex · 逐词对照真实词条、音标与原站录音",
+    "reviewedAt": "2026-10-31T04:42:03.154Z",
+    "digest": "665d83af14743669aba5668df0dc2c1732380790631fc1f5601178b2fc9ab691",
+    "textOrigin": "Original teaching text; no copied dictionary definitions or examples.",
+    "audioSourceURL": "https://dictionaryapi.com/products/api-learners-dictionary",
+    "pronunciationChecked": {
+      "dictionaryHTTP": 200,
+      "audioHTTP": 206,
+      "type": "audio/mpeg",
+      "bytesRead": 512
+    },
+    "supersedes": [
+      {
+        "id": "v01-blanket-20261028",
+        "version": "2026-10-28.1"
+      }
+    ],
+    "textReview": "Simplified original English; same selected sense, pronunciation and accent.",
+    "visualReview": {
+      "approved": true,
+      "note": "逐图目视核对目标词义，画面不包含目标拼写；来源许可已核对。"
+    }
+  },
+  {
+    "id": "v01-ticket-20261031-rfix",
+    "version": "2026-10-31.2",
+    "normalizedForm": "ticket",
+    "provider": "merriam-webster/learners",
+    "entryId": "ticket:1",
+    "senseId": "ticket:1#1",
+    "accent": "US",
+    "audioId": "ticket01",
+    "reviewedBy": "Codex · 逐词对照真实词条、音标与原站录音",
+    "reviewedAt": "2026-10-31T04:42:03.154Z",
+    "digest": "e1eb71b809de1294281b8092c6d1fba968d6bcb48237dace75f959de8c7c19ef",
+    "textOrigin": "Original teaching text; no copied dictionary definitions or examples.",
+    "audioSourceURL": "https://dictionaryapi.com/products/api-learners-dictionary",
+    "pronunciationChecked": {
+      "dictionaryHTTP": 200,
+      "audioHTTP": 206,
+      "type": "audio/mpeg",
+      "bytesRead": 512
+    },
+    "supersedes": [
+      {
+        "id": "v01-ticket-20261028",
+        "version": "2026-10-28.1"
+      }
+    ],
+    "textReview": "Simplified original English; same selected sense, pronunciation and accent.",
+    "visualReview": {
+      "approved": true,
+      "note": "逐图目视核对目标词义，画面不包含目标拼写；来源许可已核对。"
+    }
+  },
+  {
+    "id": "v01-planet-20261031-rfix",
+    "version": "2026-10-31.2",
+    "normalizedForm": "planet",
+    "provider": "merriam-webster/learners",
+    "entryId": "planet",
+    "senseId": "planet#1",
+    "accent": "US",
+    "audioId": "planet01",
+    "reviewedBy": "Codex · 逐词对照真实词条、音标与原站录音",
+    "reviewedAt": "2026-10-31T04:42:03.154Z",
+    "digest": "032322b2f5a9b4572ae9d7dd590eac79228a4bd466351e3265a46a60cc09eaee",
+    "textOrigin": "Original teaching text; no copied dictionary definitions or examples.",
+    "audioSourceURL": "https://dictionaryapi.com/products/api-learners-dictionary",
+    "pronunciationChecked": {
+      "dictionaryHTTP": 200,
+      "audioHTTP": 206,
+      "type": "audio/mpeg",
+      "bytesRead": 512
+    },
+    "supersedes": [
+      {
+        "id": "v01-planet-20261028",
+        "version": "2026-10-28.1"
+      }
+    ],
+    "textReview": "Simplified original English; same selected sense, pronunciation and accent.",
+    "visualReview": {
+      "approved": true,
+      "note": "逐图目视核对目标词义，画面不包含目标拼写；来源许可已核对。"
+    }
+  },
+  {
+    "id": "v01-orange-20261031-rfix",
+    "version": "2026-10-31.2",
+    "normalizedForm": "orange",
+    "provider": "merriam-webster/learners",
+    "entryId": "orange",
+    "senseId": "orange#1",
+    "accent": "US",
+    "audioId": "orange01",
+    "reviewedBy": "Codex · 逐词对照真实词条、音标与原站录音",
+    "reviewedAt": "2026-10-31T04:42:03.154Z",
+    "digest": "2f9f63c726e957da0081d298c498a655f8577c62a82fa89a0ff1d64af7fd92ae",
+    "textOrigin": "Original teaching text; no copied dictionary definitions or examples.",
+    "audioSourceURL": "https://www.merriam-webster.com/dictionary/orange?dir=o&file=orange01&lang=en_us",
+    "pronunciationChecked": {
+      "dictionaryHTTP": 200,
+      "audioHTTP": 206,
+      "type": "audio/mpeg",
+      "bytesRead": 512
+    },
+    "supersedes": [
+      {
+        "id": "v01-orange-20261028",
+        "version": "2026-10-28.1"
+      }
+    ],
+    "textReview": "Simplified original English; same selected sense, pronunciation and accent.",
+    "visualReview": {
+      "approved": true,
+      "note": "逐图目视核对目标词义，画面不包含目标拼写；来源许可已核对。"
+    }
+  },
+  {
+    "id": "v01-pear-20261031-rfix",
+    "version": "2026-10-31.2",
+    "normalizedForm": "pear",
+    "provider": "merriam-webster/learners",
+    "entryId": "pear",
+    "senseId": "pear#path:0.0.0",
+    "accent": "US",
+    "audioId": "pear0001",
+    "reviewedBy": "Codex · 逐词对照真实词条、音标与原站录音",
+    "reviewedAt": "2026-10-31T04:42:03.154Z",
+    "digest": "1ebe0c3b8eec7f732b25070845dd8961a482eb3daa6785727050e8ecf769102c",
+    "textOrigin": "Original teaching text; no copied dictionary definitions or examples.",
+    "audioSourceURL": "https://dictionaryapi.com/products/api-learners-dictionary",
+    "pronunciationChecked": {
+      "dictionaryHTTP": 200,
+      "audioHTTP": 206,
+      "type": "audio/mpeg",
+      "bytesRead": 512
+    },
+    "supersedes": [
+      {
+        "id": "v01-pear-20261028",
+        "version": "2026-10-28.1"
+      }
+    ],
+    "textReview": "Simplified original English; same selected sense, pronunciation and accent.",
+    "visualReview": {
+      "approved": true,
+      "note": "逐图目视核对目标词义，画面不包含目标拼写；来源许可已核对。"
     }
   }
 ]);

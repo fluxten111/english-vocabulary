@@ -52,3 +52,16 @@ test('真实12词可完成两组全部必要阶段与发音、拼写弱项重练
  assert.equal(s.group,1);assert(batch.completedAt);assert(db.events.some(e=>e.phase==='pronounceRetry'));assert(db.events.some(e=>e.phase==='spellRetry'));
  assert.equal(db.words.length,12);assert(db.events.length>60);
 });
+
+test('当前十三词均有逐图核对来源与许可，源文件存在且不含目标答案的替代文字',async()=>{
+ const fs=await import('node:fs');
+ for(const [word,c]of Object.entries(reviewedLessons)){
+  assert(c.visual,word);assert.equal(c.visual.senseId,c.senseId);assert(!c.visual.alt.toLowerCase().includes(word));assert(c.visual.author);assert.match(c.visual.sourcePage,/^https:\/\/commons\.wikimedia\.org\/wiki\/File:/);assert(fs.existsSync(new URL(c.visual.src,import.meta.url)),c.visual.src);
+ }
+});
+test('旧核对版本继续可验证，保留旧备份兼容路径',async()=>{
+ for(const c of Object.values(reviewedLessons)){
+  const record=reviewedContent.find(r=>r.id===c.reviewId&&r.version===c.reviewVersion);
+  assert(record.supersedes?.length);for(const old of record.supersedes)assert(reviewedContent.some(r=>r.id===old.id&&r.version===old.version));
+ }
+});
