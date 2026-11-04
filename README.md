@@ -4,6 +4,8 @@
 
 ## PR 自动检查（2026-11-04）
 
+审核入口：[仓库规则](AGENTS.md)、[PR质量审核流程](docs/quality-review.md)、[已知问题与覆盖缺口](docs/quality-baseline-20261104.md)。新PR使用仓库模板，逐项对应任务、MD、用户要求与证据。规则已准备不等于Codex自动审核已连接；当前连接由用户暂缓，最终合并及产品验收由用户决定。
+
 技术栈为原生 HTML/CSS、浏览器 JavaScript ES Modules，后端为独立部署的 Cloudflare Workers；没有前端框架、编译器、打包器或 TypeScript 配置。新增 npm 工具只用于开发检查，不改变网站运行方式。
 
 在 Node.js 22.13+（CI 使用 Node 22）及 npm 环境执行：
