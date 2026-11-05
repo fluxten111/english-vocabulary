@@ -7,21 +7,22 @@ import {test} from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import vm from 'node:vm';
 import * as core from './core.mjs';import * as content from './content.mjs';
 import {createPlayback} from './media.mjs';
+import {reviewedLessons as catalogLessons} from './review-catalog.mjs';
 const settle=async()=>{for(let i=0;i<15;i++)await new Promise(setImmediate)};
-async function setup({phase='sound',secondMissing=false,lookup,mediaDevices,mediaRecorder,auditDelayMs=0,feedbackService=null}={}){
-  const db=core.fresh();core.createBatch(db,'worda,wordb','TEST ONLY');const reviews=[];
+async function setup({phase='sound',lessonForm,secondMissing=false,lookup,mediaDevices,mediaRecorder,auditDelayMs=0,feedbackService=null}={}){
+  const db=core.fresh();core.createBatch(db,`${lessonForm||'worda'},wordb`,'TEST ONLY');const reviews=[];
   const contents=[];
   for(const [i,w]of db.words.entries()){
-    const c={checked:true,entryId:w.normalized,senseId:w.normalized+'#1',reviewId:'review-'+i,reviewVersion:'1',cue:'A controlled test cue.',audio:{kind:'dictionary',id:'test-audio',url:'https://example.invalid/test.mp3',source:'TEST ONLY',accent:'US',license:'TEST ONLY'},ipa:'test',ipaAccent:'US',ipaSource:'TEST ONLY',definition:'Test definition.',definitionSource:'TEST ONLY',example:'Test example.',exampleSource:'TEST ONLY',chinese:'测试含义',chineseSource:'TEST ONLY'};
+    const c=lessonForm&&i===0?catalogLessons[lessonForm]:{checked:true,entryId:w.normalized,senseId:w.normalized+'#1',reviewId:'review-'+i,reviewVersion:'1',cue:'A controlled test cue.',audio:{kind:'dictionary',id:'test-audio',url:'https://example.invalid/test.mp3',source:'TEST ONLY',accent:'US',license:'TEST ONLY'},ipa:'test',ipaAccent:'US',ipaSource:'TEST ONLY',definition:'Test definition.',definitionSource:'TEST ONLY',example:'Test example.',exampleSource:'TEST ONLY',chinese:'测试含义',chineseSource:'TEST ONLY'};
     contents.push(c);w.content=secondMissing&&i===1?null:c;
-    reviews.push({id:c.reviewId,version:'1',reviewedBy:'test',reviewedAt:'2026-10-28T00:00:00Z',normalizedForm:w.normalized,provider:'merriam-webster/learners',entryId:c.entryId,senseId:c.senseId,accent:'US',digest:await content.contentDigest(c)});
+    reviews.push({id:c.reviewId,version:c.reviewVersion,reviewedBy:'test',reviewedAt:'2026-10-28T00:00:00Z',normalizedForm:w.normalized,provider:'merriam-webster/learners',entryId:c.entryId,senseId:c.senseId,accent:'US',digest:await content.contentDigest(c)});
   }
   db.sessions[0].phase=phase;if(phase.endsWith('Retry'))db.sessions[0].queue=db.words.map(w=>w.id);
   const nodes=new Map, audios=[],ownAudios=[],mediaTimers=new Map;let mediaTimer=0;let rootWrites=0, stored=JSON.stringify(db), preparer;
   const make=key=>{let html='',ownText='';return{key,children:[],dataset:{},value:'',disabled:false,get textContent(){return ownText},set textContent(v){ownText=v;this.children=[]},
     get innerHTML(){return html},set innerHTML(value){html=value;if(key==='#app'){rootWrites++;for(const id of ['#spelling','#sentence','#lesson'])nodes.delete(id)}},
     append(...items){this.children.push(...items)},replaceChildren(...items){this.children=[];this.append(...items)},focus(){},addEventListener(){},classList:{toggle(){}},setAttribute(){},removeAttribute(){},
-    insertAdjacentHTML(pos,text){if(text.includes('id="spelling"'))nodes.set('#spelling',make('#spelling'));if(text.includes('id="sentence"'))nodes.set('#sentence',make('#sentence'));},
+    insertAdjacentHTML(pos,text){html+=text;if(text.includes('id="spelling"'))nodes.set('#spelling',make('#spelling'));if(text.includes('id="sentence"'))nodes.set('#sentence',make('#sentence'));},
   }};
   const document={hidden:false,addEventListener(){},createTextNode(text){return {textContent:text}},querySelector(key){if(key==='#sentenceFeedback'){const find=n=>n.id==='sentenceFeedback'?n:(n.children||[]).map(find).find(Boolean);return [...nodes.values()].map(find).find(Boolean)||null;}if(['#spelling','#sentence','#resumePrepared'].includes(key))return nodes.get(key)||null;if(!nodes.has(key))nodes.set(key,make(key));return nodes.get(key)},querySelectorAll(){return[]},createElement(){return make('button')}};
   let feedbackHashCalls=0,reportStarted;const feedbackStarted=new Promise(resolve=>reportStarted=resolve);
@@ -170,4 +171,46 @@ test('摘要不匹配的既有内容不会被启动准备静默覆盖',async()=>
 });
 test('混合批次准备空内容时也不覆盖另一词的未知本地修改',async()=>{
  const t=await setup({secondMissing:true});t.ctx.reviewedLessons.wordb=t.contents[1];t.run("db.words[0].content.definition='Unrecognized edit';db.words[1].content=null;checkedContent.clear()");await t.run('auditStoredContent()');assert.equal(t.state().words[0].content.definition,'Unrecognized edit');assert.equal(t.state().words[1].content.senseId,'wordb#1');
+});
+
+// Actual rendered output only. Browser geometry and screen-reader speech need real UI checks.
+const lessonMarkup=t=>t.element(n=>n.className==='lesson-content').innerHTML;
+const translations=[['apple','苹果（水果）'],['book','书；书本（装订的纸页）'],['chair','椅子（供一人坐、有靠背）'],['river','河；河流（自然流动的水道）'],['garden','花园；菜园（种植植物的地块）'],['window','窗；窗户（墙上的采光、通风开口）'],['pencil','铅笔（可书写、绘画的工具）'],['basket','篮子；筐（编织的容器）'],['blanket','毯子（保暖的布质覆盖物）'],['ticket','票；入场券；车票（入场或乘车凭证）'],['planet','行星（围绕恒星运行的天体）'],['orange','橙子（柑橘类水果）'],['pear','梨（上窄下宽的水果）']];
+test('Q2：十三词声音中文正文仅含词义，来源另可查且原数据不变',async()=>{
+ for(const [form,want]of translations){const t=await setup({lessonForm:form});const before=JSON.stringify(t.state().words[0].content);
+  const hint=t.element(n=>n.id==='soundHint-chinese');assert.equal(hint.hidden,true);t.button('显示中文含义').onclick();assert.equal(hint.textContent,want);
+  t.button('显示英文拼写').onclick();assert.equal(t.element(n=>n.id==='soundHint-spelling').textContent,form);
+  assert(t.element(n=>n.className==='chinese-source-note')?.textContent.includes('词间编写'));
+  assert.equal(JSON.stringify(t.state().words[0].content),before);t.button('隐藏中文含义').onclick();assert.equal(hint.hidden,true);
+ }
+});
+test('Q2：十三词教学中文仅含词义，折叠来源保留中文出处',async()=>{
+ for(const [form,want]of translations){const t=await setup({phase:'teach',lessonForm:form});t.button('显示中文').onclick();assert.equal(t.element(n=>n.id==='lessonTranslation').textContent,want);
+  const source=lessonMarkup(t).match(/<details class="lesson-sources">([\s\S]*?)<\/details>/)?.[1];assert(source);assert(source.includes('中文：词间编写'));
+  t.button('隐藏中文').onclick();assert.equal(t.element(n=>n.id==='lessonTranslation').hidden,true);
+ }
+});
+test('Q5：提交后结果含播报语义与正确/差异文案，重练身份准确，保存失败不揭晓',async()=>{
+ for(const [phase,answer,want]of [['spell','worda','首轮默写正确'],['spell','word','首轮默写有差异'],['spellRetry','worda','本次重练正确'],['spellRetry','word','本次重练有差异']]){
+  const t=await setup({phase});assert.doesNotMatch(lessonMarkup(t),/class="spelling-result/);
+  t.nodes.get('#spelling').value=answer;t.button('提交并揭晓').onclick();const result=lessonMarkup(t).match(/<section class="spelling-result [^"]+"[^>]*>[\s\S]*?<\/section>/)?.[0];assert(result);
+  assert.match(result,/<section class="spelling-result [^"]+" role="status" aria-live="polite" aria-atomic="true">/);assert(result.includes(want));assert(result.includes('worda'));
+  assert.equal(t.state().events.length,1);assert.equal(t.state().events[0].correct,answer==='worda');assert(t.button('下一步'));
+ }
+ const t=await setup({phase:'spell'});t.nodes.get('#spelling').value='worda';t.run("localStorage.setItem=()=>{throw Error('full')}");t.button('提交并揭晓').onclick();assert.equal(t.state().sessions[0].revealed,false);assert.equal(t.state().events.length,0);
+});
+test('Q5第二轮：首轮与重练只对照两份答案，不逐字列出修改指令，保留真实判分',async()=>{
+ for(const phase of ['spell','spellRetry'])for(const answer of ['aple','appppppp','axple',' Apple ']){
+  const t=await setup({phase,lessonForm:'apple'});t.nodes.get('#spelling').value=answer;t.button('提交并揭晓').onclick();
+  const result=lessonMarkup(t).match(/<section class="spelling-result [^"]+"[^>]*>[\s\S]*?<\/section>/)?.[0];assert(result);
+  assert(result.includes(`<span lang="en">${answer}</span>`));assert(result.includes('<p class="answer" lang="en">apple</p>'));
+  assert.doesNotMatch(result,/<ul\b|漏写|多写|改为|处差异/);
+  assert(result.includes(answer===' Apple '?'正确':'有差异'));
+  assert.equal(t.state().events.at(-1).correct,answer===' Apple ');assert(t.button('下一步'));
+ }
+});
+test('Q5：答案中的HTML只作为文本，长输入仍能对照正确答案',async()=>{
+ const t=await setup({phase:'spell'});t.nodes.get('#spelling').value='<img src=x onerror=alert(1)>';t.button('提交并揭晓').onclick();const result=lessonMarkup(t);assert.doesNotMatch(result,/<(?:img|script)\b/i);assert(result.includes('&lt;img src=x onerror=alert(1)&gt;'));
+ const long=await setup({phase:'spell'});long.nodes.get('#spelling').value='x'.repeat(20000);long.button('提交并揭晓').onclick();
+ assert.equal(long.state().events.at(-1).correct,false);assert(lessonMarkup(long).includes('<p class="answer" lang="en">worda</p>'));assert.doesNotMatch(lessonMarkup(long),/<ul\b|漏写|多写|改为/);
 });
