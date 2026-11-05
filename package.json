@@ -1,0 +1,21 @@
+{
+  "name": "cijian-english-vocabulary",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^22.13.0 || >=24"
+  },
+  "scripts": {
+    "build": "node scripts/check-build.mjs",
+    "test": "node --test",
+    "lint": "eslint . --max-warnings 0",
+    "ci": "npm run build && npm test && npm run lint"
+  },
+  "devDependencies": {
+    "es-module-lexer": "3.0.4",
+    "eslint": "10.14.0",
+    "globals": "17.14.0",
+    "parse5": "8.1.0"
+  }
+}

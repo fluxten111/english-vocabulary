@@ -172,7 +172,7 @@ function recordingControls(parent,s){
 }
 function soundHints(content,controls,w){
   const hints=document.createElement('div');hints.className='hint-controls';content.append(hints);
-  for(const [kind,label,text]of [['chinese','中文含义',w.content.chinese&&w.content.chineseSource?w.content.chinese+' · '+w.content.chineseSource:''],['spelling','英文拼写',w.surface]]){
+  for(const [kind,label,text]of [['chinese','中文含义',w.content.chinese&&w.content.chineseSource?w.content.chinese:''],['spelling','英文拼写',w.surface]]){
     if(!text)continue;
     const area=document.createElement('p');area.id='soundHint-'+kind;area.className='sound-hint';area.hidden=true;area.textContent=text;content.append(area);
     const toggle=button('显示'+label,()=>{
@@ -181,6 +181,16 @@ function soundHints(content,controls,w){
     },hints,'subtle');
     toggle.setAttribute('aria-controls',area.id);toggle.setAttribute('aria-expanded','false');
   }
+  if(w.content.chinese&&w.content.chineseSource){
+    const details=document.createElement('details');details.className='chinese-source';
+    const summary=document.createElement('summary');summary.textContent='中文来源';details.append(summary);
+    const source=document.createElement('p');source.className='chinese-source-note';source.textContent=w.content.chineseSource;details.append(source);hints.append(details);
+  }
+}
+// Presentation only: grading and saved answers remain in core.act().
+function spellingResult(answer,word,retry){
+  const correct=norm(answer)===word.normalized,round=retry?'本次重练':'首轮默写';
+  return `<section class="spelling-result ${correct?'is-correct':'has-difference'}" role="status" aria-live="polite" aria-atomic="true"><h3>${correct?'✓':'△'} ${round}${correct?'正确':'有差异'}</h3><p>你的答案：<span lang="en">${escape(answer)}</span></p><p class="spelling-answer-label">正确拼写</p><p class="answer" lang="en">${escape(word.surface)}</p><p>${retry?'本次重练记录已保存。':correct?'本次答案已保存。':'首轮拼错会安排至少一次重练。'}</p></section>`;
 }
 const feedbackClient=createFeedbackClient({apiBase:sentenceFeedbackConfig.apiBase});
 let feedbackReady=false,feedbackPreparing=false,feedbackAttach=null,feedbackJob=null,feedbackUnsaved=null;
@@ -350,9 +360,9 @@ function renderStudy(){
       }
     }
   }else if(s.phase==='teach'){
-    content.insertAdjacentHTML('beforeend',`<div class="word-heading"><h3 class="answer" lang="en">${escape(w.surface)}</h3><p class="lesson-ipa">/${escape(c.ipa)}/ <span class="lesson-source">${escape(c.ipaAccent)}</span></p></div><p class="lesson-definition" lang="en">${escape(c.definition)}</p><p class="lesson-example" lang="en">${escape(c.example)}</p>${c.usage?`<p class="lesson-usage"><span class="lesson-label">常见用法</span> ${escape(c.usage)}</p>`:''}<details class="lesson-sources"><summary>内容来源与说明</summary><p class="lesson-source">词性：${escape(c.partOfSpeech||'未提供')}<br>音标：${escape(c.ipaSource)}<br>释义：${escape(c.definitionSource)}<br>例句：${escape(c.exampleSource)}${c.usageSource?'<br>用法：'+escape(c.usageSource):''}<br>音频：${escape(c.audio.license)}</p></details>`);
+    content.insertAdjacentHTML('beforeend',`<div class="word-heading"><h3 class="answer" lang="en">${escape(w.surface)}</h3><p class="lesson-ipa">/${escape(c.ipa)}/ <span class="lesson-source">${escape(c.ipaAccent)}</span></p></div><p class="lesson-definition" lang="en">${escape(c.definition)}</p><p class="lesson-example" lang="en">${escape(c.example)}</p>${c.usage?`<p class="lesson-usage"><span class="lesson-label">常见用法</span> ${escape(c.usage)}</p>`:''}<details class="lesson-sources"><summary>内容来源与说明</summary><p class="lesson-source">词性：${escape(c.partOfSpeech||'未提供')}<br>音标：${escape(c.ipaSource)}<br>释义：${escape(c.definitionSource)}<br>例句：${escape(c.exampleSource)}<br>中文：${escape(c.chineseSource||'未提供')}${c.usageSource?'<br>用法：'+escape(c.usageSource):''}<br>音频：${escape(c.audio.license)}</p></details>`);
     if(c.chinese&&c.chineseSource){
-      const translation=document.createElement('p');translation.className='translation';translation.id='lessonTranslation';translation.hidden=true;translation.textContent=c.chinese+' · '+c.chineseSource;content.append(translation);
+      const translation=document.createElement('p');translation.className='translation';translation.id='lessonTranslation';translation.hidden=true;translation.textContent=c.chinese;content.append(translation);
       const reveal=button('显示中文',()=>{
         if(translation.hidden&&!update(d=>act(d,active,'chinese')))return;
         translation.hidden=!translation.hidden;
@@ -378,7 +388,7 @@ function renderStudy(){
       content.insertAdjacentHTML('beforeend','<label class="spelling-label">输入你听到的词<input id="spelling" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></label>');
       button('提交并揭晓',()=>perform('spell',$('#spelling').value),controls,'primary');
     }else{
-      content.insertAdjacentHTML('beforeend',`<p>你的答案：${escape(s.answer)}</p><p class="answer" lang="en">${escape(w.surface)}</p><p>${norm(s.answer)===w.normalized?'这次拼写正确。':'这次有差异。首轮拼错会安排至少一次重练。'}</p>`);
+      content.insertAdjacentHTML('beforeend',spellingResult(s.answer,w,s.phase==='spellRetry'));
       if(s.phase==='spellRetry')button('这个词再练一次',()=>perform('retry'),controls);
       button('下一步',()=>perform('next'),controls,'primary');
     }
