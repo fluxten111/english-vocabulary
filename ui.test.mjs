@@ -9,12 +9,12 @@ import * as core from './core.mjs';import * as content from './content.mjs';
 import {createPlayback} from './media.mjs';
 import {reviewedLessons as catalogLessons} from './review-catalog.mjs';
 const settle=async()=>{for(let i=0;i<15;i++)await new Promise(setImmediate)};
-async function setup({phase='sound',lessonForm,secondMissing=false,lookup,mediaDevices,mediaRecorder,auditDelayMs=0,feedbackService=null}={}){
+async function setup({phase='sound',lessonForm,secondMissing=false,allMissing=false,lookup,mediaDevices,mediaRecorder,auditDelayMs=0,feedbackService=null}={}){
   const db=core.fresh();core.createBatch(db,`${lessonForm||'worda'},wordb`,'TEST ONLY');const reviews=[];
   const contents=[];
   for(const [i,w]of db.words.entries()){
     const c=lessonForm&&i===0?catalogLessons[lessonForm]:{checked:true,entryId:w.normalized,senseId:w.normalized+'#1',reviewId:'review-'+i,reviewVersion:'1',cue:'A controlled test cue.',audio:{kind:'dictionary',id:'test-audio',url:'https://example.invalid/test.mp3',source:'TEST ONLY',accent:'US',license:'TEST ONLY'},ipa:'test',ipaAccent:'US',ipaSource:'TEST ONLY',definition:'Test definition.',definitionSource:'TEST ONLY',example:'Test example.',exampleSource:'TEST ONLY',chinese:'测试含义',chineseSource:'TEST ONLY'};
-    contents.push(c);w.content=secondMissing&&i===1?null:c;
+    contents.push(c);w.content=allMissing||(secondMissing&&i===1)?null:c;
     reviews.push({id:c.reviewId,version:c.reviewVersion,reviewedBy:'test',reviewedAt:'2026-10-28T00:00:00Z',normalizedForm:w.normalized,provider:'merriam-webster/learners',entryId:c.entryId,senseId:c.senseId,accent:'US',digest:await content.contentDigest(c)});
   }
   db.sessions[0].phase=phase;if(phase.endsWith('Retry'))db.sessions[0].queue=db.words.map(w=>w.id);
@@ -50,6 +50,41 @@ async function setup({phase='sound',lessonForm,secondMissing=false,lookup,mediaD
   const button=text=>{const all=[];const walk=n=>{all.push(n);for(const c of n.children||[])walk(c)};walk(nodes.get('#lesson'));return all.find(n=>n.textContent===text)};
   return{ctx,nodes,audios,ownAudios,db,contents,reviews,button,scrolls,anchors,feedbackStarted,feedbackDone:()=>Promise.all(ctx.__feedbackTasks),element:pred=>{const walk=n=>pred(n)?n:(n.children||[]).map(walk).find(Boolean);return walk(nodes.get('#lesson'));},get preparer(){return preparer},get rootWrites(){return rootWrites},state:()=>JSON.parse(vm.runInContext('JSON.stringify(db)',ctx)),run:code=>{const value=vm.runInContext(code,ctx);flushPlayback();return value}};
 }
+test('Q3a：缺项页显示终态并能主动先学就绪词，保存失败不改变队列',async()=>{
+ const t=await setup({secondMissing:true,lookup:async()=>({status:'review_required'})});
+ t.audios[0].onended();t.button('下一个').onclick();
+ assert.match(t.nodes.get('#lesson').innerHTML,/本词内容待补充/);
+ const choose=t.nodes.get('#waitingActions')?.children.find(n=>n.textContent.startsWith('先学本组已就绪词'));
+ assert(choose,'缺项时必须有主动先学入口');assert.equal(choose.disabled,false);
+ const before=t.state();t.run("localStorage.setItem=()=>{throw Error('full')}");choose.onclick();
+ assert.deepEqual(t.state(),before);assert.match(t.nodes.get('#error').textContent,/没有完成/);
+});
+test('Q3a：主动选择后保留缺项和原词表，旧音频失效；从头再学清除旧队列',async()=>{
+ const t=await setup({secondMissing:true,lookup:async()=>({status:'review_required'})});
+ const staleEnded=t.audios[0].onended;t.audios[0].onended();t.button('下一个').onclick();
+ const original=t.state().batches[0];
+ t.nodes.get('#waitingActions').children.find(n=>n.textContent.startsWith('先学本组已就绪词')).onclick();
+ const s=t.state().sessions[0];assert(s.studyPlan);assert.equal(s.phase,'pronounce');
+ assert.deepEqual(t.state().batches[0],original);const events=t.state().events.length;staleEnded();assert.equal(t.state().events.length,events);
+ t.run("active=null;resumeId=db.sessions[0].id;render()");
+ t.nodes.get('#resumeActions').children.find(n=>n.textContent==='从头再学').onclick();
+ assert.equal(t.state().sessions[0].studyPlan,undefined);assert.equal(t.state().sessions[0].phase,'sound');assert.equal(t.state().sessions[0].restarts,1);
+});
+test('Q3 input：格式预览区分内容准备；仅主动拆分指定短语，尚未保存',async()=>{
+ const t=await setup();t.run("active=null;location.hash='#new';draft='pear ice,ice cream';render();preview=parse(draft);showParse()");
+ assert.match(t.nodes.get('#parsed').innerHTML,/格式检查/);assert.match(t.nodes.get('#parsed').innerHTML,/尚无已核对学习内容/);
+ const choose=t.nodes.get('#phraseActions')?.children.find(n=>n.textContent.includes('pear ice'));
+ assert(choose);const before=t.state().batches.length;choose.onclick();
+ assert.equal(t.nodes.get('#words').value,'pear\nice\nice cream');assert.equal(t.state().batches.length,before);
+ assert.match(t.nodes.get('#parsed').innerHTML,/3 个输入项/);
+});
+test('Q3a：全组待补显示明确终态，不允许用先学入口伪造进度',async()=>{
+ const t=await setup({allMissing:true,lookup:async()=>({status:'review_required'})});
+ assert.match(t.nodes.get('#lesson').innerHTML,/本词内容待补充/);
+ const choose=t.nodes.get('#waitingActions').children.find(n=>n.textContent.startsWith('先学本组已就绪词'));
+ assert.equal(choose.disabled,true);const before=t.state();choose.onclick();assert.deepEqual(t.state(),before);
+ assert.equal(t.state().batches[0].completedAt,null);
+});
 test('Q6：原音结束只解锁当前自评，保留录音节点与滚动，不整页重绘',async()=>{
  const t=await setup({phase:'pronounce'});t.button('我已自己说出，接着听原音').onclick();
  const panel=t.element(n=>n.className==='recording-panel'),writes=t.rootWrites;t.ctx.window.scrollY=143;
