@@ -102,7 +102,8 @@ export function deferUnavailable(db,sid,verifiedIds){
   const debt=phase=>[...new Set([...(previous[phase+'Weak']||[]),...(s.phase.startsWith(phase)?[...s.weak,...s.queue].filter(id=>pending.includes(id)):[])])];
   const plan={group:s.group,active:selected,pending,done:[...previous.done],pronounceWeak:debt('pronounce'),spellWeak:debt('spell')};
   const event={id:id(),sessionId:s.id,batchId:s.batchId,wordId:owner,phase:s.phase,type:'defer_unready',value:'ready_subset',at:new Date().toISOString(),attempt:s.attempt||0,restarts:s.restarts||0,selectedWordIds:[...selected],pendingWordIds:[...pending]};
-  s.studyPlan=plan;s.attempt=(s.attempt||0)+1;s.said=false;s.listened=false;s.revealed=false;s.answer='';
+  // Older clients must reject subset indexes instead of silently using original order.
+  db.schema=2;s.studyPlan=plan;s.attempt=(s.attempt||0)+1;s.said=false;s.listened=false;s.revealed=false;s.answer='';
   if(restart)change(s,'sound');
   else{
     s.index=oldSequence.slice(0,s.index).filter(id=>selected.includes(id)).length;
@@ -184,7 +185,7 @@ export function reviseSentence(db,sid,value){
   s.answer=value;db.events.push(event);return event;
 }
 export function validate(db) {
-  if (!db || db.schema !== 1 || !Number.isInteger(db.revision) || db.revision < 0)
+  if (!db || ![1,2].includes(db.schema) || !Number.isInteger(db.revision) || db.revision < 0)
     throw Error('备份版本不支持。');
   for (const key of ['words','batches','sessions','events']) {
     if (!Array.isArray(db[key]) || db[key].length > 200000) throw Error('备份结构不正确。');
@@ -237,7 +238,7 @@ export function validate(db) {
     if(s.studyPlan!==undefined){
       const p=s.studyPlan,original=originalGroupWords(db,s);
       const validIds=a=>Array.isArray(a)&&new Set(a).size===a.length&&a.every(id=>original.includes(id));
-      if(!p||typeof p!=='object'||p.group!==s.group||s.status==='completed'||!['active','pending','done','pronounceWeak','spellWeak'].every(k=>validIds(p[k]))||!p.active.length)throw Error('待补学习队列损坏。');
+      if(db.schema!==2||!p||typeof p!=='object'||p.group!==s.group||s.status==='completed'||!['active','pending','done','pronounceWeak','spellWeak'].every(k=>validIds(p[k]))||!p.active.length)throw Error('待补学习队列损坏。');
       const partition=[...p.active,...p.pending,...p.done];
       if(partition.length!==original.length||new Set(partition).size!==original.length||p.pronounceWeak.some(id=>p.done.includes(id))||p.spellWeak.some(id=>p.done.includes(id))||s.queue.some(id=>!p.active.includes(id))||s.weak.some(id=>!p.active.includes(id)))throw Error('待补学习分区不一致。');
       for(const wid of p.done){
@@ -270,6 +271,6 @@ export function validate(db) {
   }
   return db;
 }
-export function merge(local,incoming){validate(incoming);const out=structuredClone(local),conflicts=[];for(const key of ['words','batches','sessions','events'])for(const x of incoming[key]){const old=out[key].find(y=>y.id===x.id);if(old&&JSON.stringify(old)!==JSON.stringify(x))conflicts.push(key+': '+x.id);else if(!old)out[key].push(x)}if(conflicts.length)throw Error(`有 ${conflicts.length} 条相同编号但内容不同的记录，未导入；请保留两份备份后处理。`);validate(out);return out}
+export function merge(local,incoming){validate(incoming);const out=structuredClone(local),conflicts=[];out.schema=Math.max(local.schema,incoming.schema);for(const key of ['words','batches','sessions','events'])for(const x of incoming[key]){const old=out[key].find(y=>y.id===x.id);if(old&&JSON.stringify(old)!==JSON.stringify(x))conflicts.push(key+': '+x.id);else if(!old)out[key].push(x)}if(conflicts.length)throw Error(`有 ${conflicts.length} 条相同编号但内容不同的记录，未导入；请保留两份备份后处理。`);validate(out);return out}
 export function save(storage,db){validate(db);const text=JSON.stringify(db);storage.setItem('vocab-v01',text);if(storage.getItem('vocab-v01')!==text)throw Error('保存后读回不一致。');return db}
 export function transaction(storage,db,fn){const stored=storage.getItem('vocab-v01');if(stored&&JSON.parse(stored).revision!==db.revision)throw Error('其他页面已更新学习记录，请刷新后继续。');const copy=structuredClone(db);fn(copy);copy.revision++;save(storage,copy);return copy}

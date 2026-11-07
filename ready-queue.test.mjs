@@ -136,3 +136,10 @@ test('Q3a: forged done entries without five-stage history cannot survive import'
  const db=fixture();step(db);defer(db);const p=db.sessions[0].studyPlan;
  p.done.push(p.active.shift());assert.throws(()=>core.validate(db),/伪造已完成/);
 });
+test('Q3a compatibility: new queues carry a version old clients reject; legacy backups still import',()=>{
+ const legacy=fixture(),newer=structuredClone(legacy);step(newer);defer(newer);
+ assert.equal(newer.schema,2,'Old readers must not silently interpret a subset index as original order');
+ assert.equal(core.validate(structuredClone(legacy)).schema,1);
+ const bad=structuredClone(newer);bad.schema=1;assert.throws(()=>core.validate(bad));
+ const merged=core.merge(core.fresh(),newer);assert.equal(merged.schema,2);assert.deepEqual(merged.sessions,newer.sessions);
+});
