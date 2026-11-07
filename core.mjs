@@ -2,12 +2,39 @@ import {validateFeedbackResponse} from './sentence-feedback.mjs?v=20261031-rfix-
 export const norm=s=>s.trim().toLowerCase().replace(/[’]/g,"'").replace(/\s+/g,' ');
 export const id=()=>crypto.randomUUID();
 export const fresh=()=>({schema:1,revision:0,words:[],batches:[],sessions:[],events:[]});
-export function parse(raw){const words=[],duplicates=[],invalid=[];const seen=new Set;for(const token of raw.split(/[\n,;，；\t]+/)){const s=token.trim();if(!s)continue;if(!/^[a-zA-Z]+(?:[ '\-’][a-zA-Z]+)*$/.test(s)){invalid.push(s);continue}const n=norm(s);if(seen.has(n))duplicates.push(s);else{seen.add(n);words.push(s)}}return{words,duplicates,invalid}}
-export function splitPhraseInput(raw,target){
-  if(typeof raw!=='string'||typeof target!=='string'||!target.trim().includes(' ')||parse(target).words.length!==1)throw Error('请选择预览中的短语再拆分。');
-  return raw.split(/[\n,;，；\t]+/).map(token=>norm(token)===norm(target)?token.trim().split(/\s+/).join('\n'):token).join('\n');
+const listBreak=/[\r\n\t,，;；、。]+/u;
+const inputForm=/^[A-Za-z]+(?:[ '-][A-Za-z]+)*$/u;
+// Import-only normalization: do not change grading or existing stored word IDs.
+export function scanInput(raw){
+  return raw.split(listBreak).map((original,index)=>({index,original,
+    text:original.trim().replace(/\p{Zs}+/gu,' ').replace(/’/g,"'").replace(/[\u2010\u2011]/g,'-')
+  })).filter(item=>item.text.length>0);
 }
-export function createBatch(db,raw,name,skipExisting=false){const p=parse(raw);const wordIds=[];for(const surface of p.words){let w=db.words.find(w=>w.normalized===norm(surface));if(w&&skipExisting)continue;if(!w){w={id:id(),surface,normalized:norm(surface),content:null};db.words.push(w)}wordIds.push(w.id)}if(!wordIds.length)throw Error('没有可建立批次的词。');const b={id:id(),name:name||'我的词表',originalInput:raw,wordIds,createdAt:new Date().toISOString(),completedAt:null};db.batches.push(b);db.sessions.push(session(b));return b}
+export function parse(raw){
+  const words=[],duplicates=[],invalid=[],seen=new Set();
+  for(const {original,text}of scanInput(raw)){
+    if(text.length>500||!inputForm.test(text)){invalid.push(original.trim());continue;}
+    const key=norm(text);
+    if(seen.has(key))duplicates.push(text);else{seen.add(key);words.push(text);}
+  }
+  return{words,duplicates,invalid};
+}
+export function splitPhraseInput(raw,target){
+  if(typeof raw!=='string')throw Error('请选择预览中的含空格输入再拆分。');
+  const items=scanInput(raw),key=typeof target==='string'?scanInput(target):null;
+  const selected=typeof target==='number'?items.find(item=>item.index===target):
+    key?.length===1?items.find(item=>norm(item.text)===norm(key[0].text)):null;
+  if(!selected||selected.text.length>500||!inputForm.test(selected.text)||!selected.text.includes(' '))throw Error('请选择预览中的含空格输入再拆分。');
+  return items.map(item=>item.index===selected.index?item.text.split(' ').join('\n'):item.original).join('\n');
+}
+export function createBatch(db,raw,name,skipExisting=false,{ignoreInvalid=false,originalInput=raw}={}){
+  const p=parse(raw);
+  if(p.invalid.length&&ignoreInvalid!==true)throw Error('还有格式待处理项，请修正或明确确认忽略后再保存。');
+  const wordIds=[];
+  for(const surface of p.words){let w=db.words.find(w=>w.normalized===norm(surface));if(w&&skipExisting)continue;if(!w){w={id:id(),surface,normalized:norm(surface),content:null};db.words.push(w)}wordIds.push(w.id)}
+  if(!wordIds.length)throw Error('没有可建立批次的词。');
+  const b={id:id(),name:name||'我的词表',originalInput,wordIds,createdAt:new Date().toISOString(),completedAt:null};db.batches.push(b);db.sessions.push(session(b));return b;
+}
 export function session(b,replay=false){return{id:id(),batchId:b.id,replay,status:'new',group:0,phase:'sound',index:0,queue:[],weak:[],revealed:false,said:false,listened:false,answer:'',startedAt:null,completedAt:null,restarts:0,attempt:0}}
 const studyActions=new Set(['next','said','listened','assess','spell','sentence','sentenceRevision','hint','chinese','retry','rerecord','defer_unready']);
 const timestamp=value=>typeof value==='string'&&Number.isFinite(Date.parse(value))?Date.parse(value):0;

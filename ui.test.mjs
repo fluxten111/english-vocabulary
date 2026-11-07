@@ -20,7 +20,11 @@ async function setup({phase='sound',lessonForm,secondMissing=false,allMissing=fa
   db.sessions[0].phase=phase;if(phase.endsWith('Retry'))db.sessions[0].queue=db.words.map(w=>w.id);
   const nodes=new Map, audios=[],ownAudios=[],mediaTimers=new Map,scrolls=[],anchors=[];let mediaTimer=0;let rootWrites=0, stored=JSON.stringify(db), preparer;
   const make=key=>{let html='',ownText='';return{key,children:[],dataset:{},value:'',disabled:false,get textContent(){return ownText},set textContent(v){ownText=v;this.children=[]},
-    get innerHTML(){return html},set innerHTML(value){html=value;if(key==='#app'){rootWrites++;for(const id of ['#spelling','#sentence','#lesson'])nodes.delete(id)}},
+    get innerHTML(){return html},set innerHTML(value){html=value;
+      // Replaced DOM descendants must not remain findable as live controls.
+      const previewIds=['#phraseActions','#confirmAction','#ignoreInvalid','#skip'];
+      if(key==='#parsed'||key==='#app')for(const id of previewIds)nodes.delete(id);
+      if(key==='#app'){rootWrites++;for(const id of ['#spelling','#sentence','#lesson','#words','#name','#check','#wordfile','#parsed'])nodes.delete(id)}},
     append(...items){this.children.push(...items)},replaceChildren(...items){this.children=[];this.append(...items)},focus(){},scrollIntoView(){anchors.push(key)},addEventListener(){},classList:{toggle(){}},setAttribute(){},removeAttribute(){},
     insertAdjacentHTML(pos,text){html+=text;if(text.includes('id="spelling"'))nodes.set('#spelling',make('#spelling'));if(text.includes('id="sentence"'))nodes.set('#sentence',make('#sentence'));},
   }};
@@ -77,6 +81,71 @@ test('Q3 input：格式预览区分内容准备；仅主动拆分指定短语，
  assert(choose);const before=t.state().batches.length;choose.onclick();
  assert.equal(t.nodes.get('#words').value,'pear\nice\nice cream');assert.equal(t.state().batches.length,before);
  assert.match(t.nodes.get('#parsed').innerHTML,/3 个输入项/);
+});
+test('Q1 R3：常见分隔与多空格进入预览，含空格项默认保留且不冒充词典查证',async()=>{
+ const t=await setup();t.run("active=null;location.hash='#new';draft='bear。ice、ice  cream，well‑known';render();preview=parse(draft);showParse()");
+ const html=t.nodes.get('#parsed').innerHTML;
+ assert.match(html,/4 个输入项/);assert.match(html,/ice cream/);assert.match(html,/well-known/);
+ assert.match(html,/默认保留/);assert.match(html,/未作词典查证/);assert.doesNotMatch(html,/已确认词组/);
+ assert.equal(t.state().batches.length,1);
+});
+test('Q1 R3：异常项须明确确认忽略，未确认时不能绕过禁用直接部分保存',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});
+ t.run("active=null;location.hash='#new';draft='bear/ice，pear';render();preview=parse(draft);showParse()");
+ const save=t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表');
+ assert.equal(save.disabled,true);const before=t.state();save.onclick();assert.deepEqual(t.state(),before);
+ const ignore=t.nodes.get('#ignoreInvalid');assert(ignore?.onchange);ignore.checked=true;ignore.onchange();
+ assert.equal(save.disabled,false);save.onclick();await settle();
+ const d=t.state(),batch=d.batches.at(-1);assert.equal(d.batches.length,2);
+ assert.equal(batch.originalInput,'bear/ice，pear');assert.deepEqual(batch.wordIds.map(id=>d.words.find(w=>w.id===id).surface),['pear']);
+});
+test('Q1 R3：主动拆分后保存失败保留原输入，重试成功持久化实际确认结果',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+ const field=t.nodes.get('#words'),raw='pear     ice、ice cream。well‑known';field.value=raw;field.oninput({target:field});t.nodes.get('#check').onclick();
+ t.nodes.get('#phraseActions').children.find(n=>n.textContent.includes('pear ice')).onclick();
+ assert.deepEqual(core.parse(t.nodes.get('#words').value).words,['pear','ice','ice cream','well-known']);
+ const before=t.state(),save=t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表');
+ t.run('globalThis.__originalSave=localStorage.setItem;localStorage.setItem=()=>{throw Error("full")}');save.onclick();
+ assert.deepEqual(t.state(),before);assert.match(t.nodes.get('#error').textContent,/没有完成/);
+ t.run('localStorage.setItem=globalThis.__originalSave');save.onclick();await settle();
+ const d=t.state(),batch=d.batches.at(-1);assert.equal(batch.originalInput,raw);
+ assert.deepEqual(batch.wordIds.map(id=>d.words.find(w=>w.id===id).surface),['pear','ice','ice cream','well-known']);
+ assert.deepEqual(d.batches[0],before.batches[0]);
+});
+test('Q1 R3：编辑后旧确认失效，重新检查才能保存新输入',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';draft='pear';render();preview=parse(draft);showParse()");
+ const old=t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表');
+ const field=t.nodes.get('#words');field.value='bear、river';field.oninput({target:field});
+ const before=t.state();old.onclick();assert.deepEqual(t.state(),before);
+ t.nodes.get('#check').onclick();t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
+ const d=t.state(),batch=d.batches.at(-1);assert.equal(batch.originalInput,'bear、river');
+ assert.deepEqual(batch.wordIds.map(id=>d.words.find(w=>w.id===id).surface),['bear','river']);
+});
+test('Q1 R3：文件上传与粘贴共用输入规则，并保存上传原文',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+ const raw="well‑known。ice  cream、don't";
+ await t.nodes.get('#wordfile').onchange({target:{files:[{size:raw.length,name:'TEST ONLY.txt',text:async()=>raw}]}});
+ t.nodes.get('#check').onclick();assert.match(t.nodes.get('#parsed').innerHTML,/3 个输入项/);
+ t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
+ const d=t.state(),batch=d.batches.at(-1);assert.equal(batch.originalInput,raw);
+ assert.deepEqual(batch.wordIds.map(id=>d.words.find(w=>w.id===id).surface),['well-known','ice cream',"don't"]);
+});
+test('Q1 R3：拆分后手动纠错与失败重试仍保留最初来源，清空后才视为新输入',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+ const field=t.nodes.get('#words'),source='pear     ice、bad/word、well‑known';field.value=source;field.oninput({target:field});t.nodes.get('#check').onclick();
+ t.nodes.get('#phraseActions').children.find(n=>n.textContent.includes('pear ice')).onclick();
+ field.value=field.value.replace('bad/word','river');field.oninput({target:field});t.nodes.get('#check').onclick();
+ const save=t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表');
+ t.run('globalThis.__originalSave=localStorage.setItem;localStorage.setItem=()=>{throw Error("full")}');save.onclick();
+ assert.equal(t.state().batches.length,1);t.run('localStorage.setItem=globalThis.__originalSave');save.onclick();await settle();
+ const d=t.state(),batch=d.batches.at(-1);assert.equal(batch.originalInput,source);
+ assert.deepEqual(batch.wordIds.map(id=>d.words.find(w=>w.id===id).surface),['pear','ice','river','well-known']);
+ t.run("active=null;location.hash='#new';render()");const next=t.nodes.get('#words');
+ next.value='bear ice';next.oninput({target:next});t.nodes.get('#check').onclick();
+ t.nodes.get('#phraseActions').children.find(n=>n.textContent.includes('bear ice')).onclick();
+ next.value='';next.oninput({target:next});next.value='book';next.oninput({target:next});t.nodes.get('#check').onclick();
+ t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
+ assert.equal(t.state().batches.at(-1).originalInput,'book');
 });
 test('Q3a：全组待补显示明确终态，不允许用先学入口伪造进度',async()=>{
  const t=await setup({allMissing:true,lookup:async()=>({status:'review_required'})});
