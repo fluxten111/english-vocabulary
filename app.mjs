@@ -351,7 +351,7 @@ function renderStudy(){
   }
   const w=db.words.find(x=>x.id===currentId(db,s)),c=w?.content;
   if(!usable(w,s.phase)){
-    lesson.innerHTML=`<div class="waiting"><h2 id="waitingTitle">本词内容待补充</h2><p>当前待处理项：<span lang="en">${escape(w?.surface||'未知词条')}</span></p><p id="waitingMessage">当前位置及原词表已保留，待补项不会算作完成。</p></div><div id="waitingActions" class="row"></div>${progressMarkup(s.batchId)}`;
+    lesson.innerHTML=`<div class="waiting"><h2 id="waitingTitle">本词内容待补充</h2><p>当前待处理项：<span lang="en">原词表第 ${b.wordIds.indexOf(w?.id)+1} 项</span></p><p id="waitingMessage">当前位置及原词表已保留，待补项不会算作完成。</p></div><div id="waitingActions" class="row"></div>${progressMarkup(s.batchId)}`;
     const choose=button('先学本组已就绪词',()=>{const ids=availableGroupIds(db.sessions.find(x=>x.id===active));if(update(d=>deferUnavailable(d,active,ids)))render();},$('#waitingActions'),'primary');
     button('保留词表并返回',()=>go('home'),$('#waitingActions'),'subtle');
     waitingControls={owner:currentPosition(),title:$('#waitingTitle'),message:$('#waitingMessage'),choose};paintWaiting();return;

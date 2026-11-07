@@ -9,7 +9,7 @@ import * as core from './core.mjs';import * as content from './content.mjs';
 import {createPlayback} from './media.mjs';
 import {reviewedLessons as catalogLessons} from './review-catalog.mjs';
 const settle=async()=>{for(let i=0;i<15;i++)await new Promise(setImmediate)};
-async function setup({phase='sound',lessonForm,secondMissing=false,allMissing=false,lookup,mediaDevices,mediaRecorder,auditDelayMs=0,feedbackService=null}={}){
+async function setup({phase='sound',lessonForm,secondMissing=false,allMissing=false,capturePendingAudit=false,lookup,mediaDevices,mediaRecorder,auditDelayMs=0,feedbackService=null}={}){
   const db=core.fresh();core.createBatch(db,`${lessonForm||'worda'},wordb`,'TEST ONLY');const reviews=[];
   const contents=[];
   for(const [i,w]of db.words.entries()){
@@ -44,11 +44,11 @@ async function setup({phase='sound',lessonForm,secondMissing=false,allMissing=fa
   });
   const source=fs.readFileSync(new URL('./app.mjs',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/^void auditStoredContent\(\);$/m,'globalThis.__startupAudit = auditStoredContent();');
   // Capture the actual feedback task, including hashing; do not guess event-loop speed.
-  vm.runInContext(source+'\nconst __actualFeedback=checkSentence;globalThis.__feedbackTasks=[];checkSentence=(...args)=>{const task=__actualFeedback(...args);__feedbackTasks.push(task);return task;};',ctx);await ctx.__startupAudit;await settle();
+  vm.runInContext(source+'\nconst __actualFeedback=checkSentence;globalThis.__feedbackTasks=[];checkSentence=(...args)=>{const task=__actualFeedback(...args);__feedbackTasks.push(task);return task;};',ctx);let pendingAuditHtml=null;if(capturePendingAudit){vm.runInContext('active=db.sessions[0].id;render()',ctx);pendingAuditHtml=nodes.get('#lesson').innerHTML;}await ctx.__startupAudit;await settle();
   const flushPlayback=()=>{for(const [id,fn]of [...mediaTimers]){mediaTimers.delete(id);fn();}};
   vm.runInContext('active=db.sessions[0].id;render()',ctx);flushPlayback();await settle();
   const button=text=>{const all=[];const walk=n=>{all.push(n);for(const c of n.children||[])walk(c)};walk(nodes.get('#lesson'));return all.find(n=>n.textContent===text)};
-  return{ctx,nodes,audios,ownAudios,db,contents,reviews,button,scrolls,anchors,feedbackStarted,feedbackDone:()=>Promise.all(ctx.__feedbackTasks),element:pred=>{const walk=n=>pred(n)?n:(n.children||[]).map(walk).find(Boolean);return walk(nodes.get('#lesson'));},get preparer(){return preparer},get rootWrites(){return rootWrites},state:()=>JSON.parse(vm.runInContext('JSON.stringify(db)',ctx)),run:code=>{const value=vm.runInContext(code,ctx);flushPlayback();return value}};
+  return{ctx,nodes,audios,ownAudios,db,contents,pendingAuditHtml,reviews,button,scrolls,anchors,feedbackStarted,feedbackDone:()=>Promise.all(ctx.__feedbackTasks),element:pred=>{const walk=n=>pred(n)?n:(n.children||[]).map(walk).find(Boolean);return walk(nodes.get('#lesson'));},get preparer(){return preparer},get rootWrites(){return rootWrites},state:()=>JSON.parse(vm.runInContext('JSON.stringify(db)',ctx)),run:code=>{const value=vm.runInContext(code,ctx);flushPlayback();return value}};
 }
 test('Q3a：缺项页显示终态并能主动先学就绪词，保存失败不改变队列',async()=>{
  const t=await setup({secondMissing:true,lookup:async()=>({status:'review_required'})});
@@ -84,6 +84,13 @@ test('Q3a：全组待补显示明确终态，不允许用先学入口伪造进�
  const choose=t.nodes.get('#waitingActions').children.find(n=>n.textContent.startsWith('先学本组已就绪词'));
  assert.equal(choose.disabled,true);const before=t.state();choose.onclick();assert.deepEqual(t.state(),before);
  assert.equal(t.state().batches[0].completedAt,null);
+});
+test('Q3a：启动核对尚未完成时，等待页不泄露声音、发音和默写的拼写',async()=>{
+ for(const phase of ['sound','pronounce','spell','spellRetry']){
+  const t=await setup({phase,lessonForm:'apple',auditDelayMs:20,capturePendingAudit:true});
+  assert(t.pendingAuditHtml);assert.doesNotMatch(t.pendingAuditHtml,/\bapple\b/i);
+  assert.match(t.pendingAuditHtml,/原词表第 1 项/);
+ }
 });
 test('Q6：原音结束只解锁当前自评，保留录音节点与滚动，不整页重绘',async()=>{
  const t=await setup({phase:'pronounce'});t.button('我已自己说出，接着听原音').onclick();
