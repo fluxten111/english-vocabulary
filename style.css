@@ -24,3 +24,4 @@ html{scrollbar-gutter:stable}@supports not (scrollbar-gutter:stable){html{overfl
 
 /* V0.1.2: input and preparation status only; leave study sizing unchanged. */
 .input-item-status{padding-left:22px;margin:12px 0}.input-item-status li{padding:6px 0;overflow-wrap:anywhere}.input-item-status li span+span{margin-left:14px;color:var(--muted);font-size:12px}.preparation-items summary{cursor:pointer;font-size:12px}
+.parse-result button{max-width:100%;overflow-wrap:anywhere;white-space:normal}
