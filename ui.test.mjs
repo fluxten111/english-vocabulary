@@ -1,3 +1,4 @@
+import {createInputChecker,inspectInput} from './spelling.mjs';
 import * as feedback from './sentence-feedback.mjs';
 import {createRecorder} from './recording.mjs';
 // Controlled integration of actual app source. Capture only the startup audit promise
@@ -8,19 +9,24 @@ import fs from 'node:fs';import vm from 'node:vm';
 import * as core from './core.mjs';import * as content from './content.mjs';
 import {createPlayback} from './media.mjs';
 import {reviewedLessons as catalogLessons} from './review-catalog.mjs';
+const actualInputCheck=createInputChecker({fetcher:async()=>new Response(fs.readFileSync(new URL('./assets/spelling-en-us.txt',import.meta.url),'utf8'))});
 const settle=async()=>{for(let i=0;i<15;i++)await new Promise(setImmediate)};
-async function setup({phase='sound',lessonForm,secondMissing=false,lookup,mediaDevices,mediaRecorder,auditDelayMs=0,feedbackService=null}={}){
+async function setup({phase='sound',lessonForm,secondMissing=false,allMissing=false,capturePendingAudit=false,lookup,mediaDevices,mediaRecorder,auditDelayMs=0,feedbackService=null,inputChecker=null}={}){
   const db=core.fresh();core.createBatch(db,`${lessonForm||'worda'},wordb`,'TEST ONLY');const reviews=[];
   const contents=[];
   for(const [i,w]of db.words.entries()){
     const c=lessonForm&&i===0?catalogLessons[lessonForm]:{checked:true,entryId:w.normalized,senseId:w.normalized+'#1',reviewId:'review-'+i,reviewVersion:'1',cue:'A controlled test cue.',audio:{kind:'dictionary',id:'test-audio',url:'https://example.invalid/test.mp3',source:'TEST ONLY',accent:'US',license:'TEST ONLY'},ipa:'test',ipaAccent:'US',ipaSource:'TEST ONLY',definition:'Test definition.',definitionSource:'TEST ONLY',example:'Test example.',exampleSource:'TEST ONLY',chinese:'测试含义',chineseSource:'TEST ONLY'};
-    contents.push(c);w.content=secondMissing&&i===1?null:c;
+    contents.push(c);w.content=allMissing||(secondMissing&&i===1)?null:c;
     reviews.push({id:c.reviewId,version:c.reviewVersion,reviewedBy:'test',reviewedAt:'2026-10-28T00:00:00Z',normalizedForm:w.normalized,provider:'merriam-webster/learners',entryId:c.entryId,senseId:c.senseId,accent:'US',digest:await content.contentDigest(c)});
   }
   db.sessions[0].phase=phase;if(phase.endsWith('Retry'))db.sessions[0].queue=db.words.map(w=>w.id);
   const nodes=new Map, audios=[],ownAudios=[],mediaTimers=new Map,scrolls=[],anchors=[];let mediaTimer=0;let rootWrites=0, stored=JSON.stringify(db), preparer;
   const make=key=>{let html='',ownText='';return{key,children:[],dataset:{},value:'',disabled:false,get textContent(){return ownText},set textContent(v){ownText=v;this.children=[]},
-    get innerHTML(){return html},set innerHTML(value){html=value;if(key==='#app'){rootWrites++;for(const id of ['#spelling','#sentence','#lesson'])nodes.delete(id)}},
+    get innerHTML(){return html},set innerHTML(value){html=value;
+      // Replaced DOM descendants must not remain findable as live controls.
+      const previewIds=['#phraseActions','#confirmAction','#ignoreInvalid','#skip'];
+      if(key==='#parsed'||key==='#app')for(const id of previewIds)nodes.delete(id);
+      if(key==='#app'){rootWrites++;for(const id of ['#spelling','#sentence','#lesson','#words','#name','#check','#wordfile','#parsed'])nodes.delete(id)}},
     append(...items){this.children.push(...items)},replaceChildren(...items){this.children=[];this.append(...items)},focus(){},scrollIntoView(){anchors.push(key)},addEventListener(){},classList:{toggle(){}},setAttribute(){},removeAttribute(){},
     insertAdjacentHTML(pos,text){html+=text;if(text.includes('id="spelling"'))nodes.set('#spelling',make('#spelling'));if(text.includes('id="sentence"'))nodes.set('#sentence',make('#sentence'));},
   }};
@@ -30,7 +36,7 @@ async function setup({phase='sound',lessonForm,secondMissing=false,lookup,mediaD
   const ctx=vm.createContext({...core,...content,...feedback,sentenceFeedbackConfig:{enabled:!!feedbackService,apiBase:feedbackService?'https://feedback.test':''},createFeedbackClient:options=>feedback.createFeedbackClient({...options,fetcher:mockFetch}),fetch:mockFetch,feedbackRequest:async(...args)=>{if(feedbackService)await new Promise(resolve=>setTimeout(resolve,++feedbackHashCalls===1?20:100));return feedback.feedbackRequest(...args);},AbortController,console,document,structuredClone,
     checkReviewedContent:async(...args)=>{if(auditDelayMs)await new Promise(resolve=>setTimeout(resolve,auditDelayMs));return content.checkReviewedContent(...args)},
     localStorage:{getItem:()=>stored,setItem:(k,v)=>stored=v},location:{hash:'#home'},
-    window:{scrollX:0,scrollY:0,addEventListener(){},scrollTo(x,y){scrolls.push([x,y]);this.scrollX=x;this.scrollY=y;}},URL,Blob,setTimeout,clearTimeout,setInterval:()=>0,
+    window:{scrollX:0,scrollY:0,addEventListener(){},scrollTo(x,y){scrolls.push([x,y]);this.scrollX=x;this.scrollY=y;}},URL,Blob,createInputChecker:()=>inputChecker||actualInputCheck,inspectInput,setTimeout,clearTimeout,setInterval:()=>0,
     navigator:{mediaDevices:mediaDevices||{getUserMedia:async()=>{throw Error('denied')}}},
     createRecorder:options=>createRecorder({...options,getStream:()=>ctx.navigator.mediaDevices.getUserMedia({audio:true}),createMediaRecorder:stream=>new ctx.MediaRecorder(stream),makeUrl:()=>'blob:test-only',revokeUrl:()=>{},createAudio:url=>{const a={url,pause(){},play:()=>Promise.resolve()};ownAudios.push(a);return a;}}),
     MediaRecorder:mediaRecorder||class{constructor(stream){this.stream=stream;this.state='inactive'}start(){this.state='recording'}stop(){this.state='inactive'}},
@@ -44,12 +50,166 @@ async function setup({phase='sound',lessonForm,secondMissing=false,lookup,mediaD
   });
   const source=fs.readFileSync(new URL('./app.mjs',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/^void auditStoredContent\(\);$/m,'globalThis.__startupAudit = auditStoredContent();');
   // Capture the actual feedback task, including hashing; do not guess event-loop speed.
-  vm.runInContext(source+'\nconst __actualFeedback=checkSentence;globalThis.__feedbackTasks=[];checkSentence=(...args)=>{const task=__actualFeedback(...args);__feedbackTasks.push(task);return task;};',ctx);await ctx.__startupAudit;await settle();
+  vm.runInContext(source+'\nconst __actualFeedback=checkSentence;globalThis.__feedbackTasks=[];checkSentence=(...args)=>{const task=__actualFeedback(...args);__feedbackTasks.push(task);return task;};',ctx);let pendingAuditHtml=null;if(capturePendingAudit){vm.runInContext('active=db.sessions[0].id;render()',ctx);pendingAuditHtml=nodes.get('#lesson').innerHTML;}await ctx.__startupAudit;await settle();
   const flushPlayback=()=>{for(const [id,fn]of [...mediaTimers]){mediaTimers.delete(id);fn();}};
   vm.runInContext('active=db.sessions[0].id;render()',ctx);flushPlayback();await settle();
   const button=text=>{const all=[];const walk=n=>{all.push(n);for(const c of n.children||[])walk(c)};walk(nodes.get('#lesson'));return all.find(n=>n.textContent===text)};
-  return{ctx,nodes,audios,ownAudios,db,contents,reviews,button,scrolls,anchors,feedbackStarted,feedbackDone:()=>Promise.all(ctx.__feedbackTasks),element:pred=>{const walk=n=>pred(n)?n:(n.children||[]).map(walk).find(Boolean);return walk(nodes.get('#lesson'));},get preparer(){return preparer},get rootWrites(){return rootWrites},state:()=>JSON.parse(vm.runInContext('JSON.stringify(db)',ctx)),run:code=>{const value=vm.runInContext(code,ctx);flushPlayback();return value}};
+  return{ctx,nodes,audios,ownAudios,db,contents,pendingAuditHtml,reviews,button,scrolls,anchors,feedbackStarted,feedbackDone:()=>Promise.all(ctx.__feedbackTasks),element:pred=>{const walk=n=>pred(n)?n:(n.children||[]).map(walk).find(Boolean);return walk(nodes.get('#lesson'));},get preparer(){return preparer},get rootWrites(){return rootWrites},state:()=>JSON.parse(vm.runInContext('JSON.stringify(db)',ctx)),run:code=>{const value=vm.runInContext(code,ctx);flushPlayback();return value}};
 }
+test('R5: result gives colored plain-language problems and has no correction choices',async()=>{
+ const t=await setup();t.run("active=null;location.hash='#new';draft='pear；youuu、pear     ice、bear/ice';render()");
+ await t.nodes.get('#check').onclick();
+ const html=t.nodes.get('#parsed').innerHTML;
+ assert.match(html,/需要调整/);assert.match(html,/没有查到这个单词/);
+ assert.match(html,/input-result--missing/);assert.match(html,/input-result--invalid/);
+ assert.match(html,/输入框/);assert.doesNotMatch(html,/id="ignoreInvalid"|id="phraseActions"/);
+});
+test('Q3a：缺项页显示终态并能主动先学就绪词，保存失败不改变队列',async()=>{
+ const t=await setup({secondMissing:true,lookup:async()=>({status:'review_required'})});
+ t.audios[0].onended();t.button('下一个').onclick();
+ assert.match(t.nodes.get('#lesson').innerHTML,/本词内容待补充/);
+ const choose=t.nodes.get('#waitingActions')?.children.find(n=>n.textContent.startsWith('先学本组已就绪词'));
+ assert(choose,'缺项时必须有主动先学入口');assert.equal(choose.disabled,false);
+ const before=t.state();t.run("localStorage.setItem=()=>{throw Error('full')}");choose.onclick();
+ assert.deepEqual(t.state(),before);assert.match(t.nodes.get('#error').textContent,/没有完成/);
+});
+test('Q3a：主动选择后保留缺项和原词表，旧音频失效；从头再学清除旧队列',async()=>{
+ const t=await setup({secondMissing:true,lookup:async()=>({status:'review_required'})});
+ const staleEnded=t.audios[0].onended;t.audios[0].onended();t.button('下一个').onclick();
+ const original=t.state().batches[0];
+ t.nodes.get('#waitingActions').children.find(n=>n.textContent.startsWith('先学本组已就绪词')).onclick();
+ const s=t.state().sessions[0];assert(s.studyPlan);assert.equal(s.phase,'pronounce');
+ assert.deepEqual(t.state().batches[0],original);const events=t.state().events.length;staleEnded();assert.equal(t.state().events.length,events);
+ t.run("active=null;resumeId=db.sessions[0].id;render()");
+ t.nodes.get('#resumeActions').children.find(n=>n.textContent==='从头再学').onclick();
+ assert.equal(t.state().sessions[0].studyPlan,undefined);assert.equal(t.state().sessions[0].phase,'sound');assert.equal(t.state().sessions[0].restarts,1);
+});
+test('Q3 input：完整短语保留；仅回输入框主动修改，尚未保存',async()=>{
+ const t=await setup();t.run("active=null;location.hash='#new';draft='pear ice,ice cream';render()");
+ await t.nodes.get('#check').onclick();
+ assert.match(t.nodes.get('#parsed').innerHTML,/请检查分隔/);assert.equal(t.nodes.get('#parsed').innerHTML.includes('id="phraseActions"'),false);
+ const before=t.state().batches.length,field=t.nodes.get('#words');field.value='pear\nice\nice cream';field.oninput({target:field});await t.nodes.get('#check').onclick();
+ assert.equal(t.state().batches.length,before);assert.match(t.nodes.get('#parsed').innerHTML,/共 3 项/);
+});
+test('Q1 R5：常见分隔与多空格共用解析，完整短语不盲拆且实际查词',async()=>{
+ const t=await setup();t.run("active=null;location.hash='#new';draft='bear。ice、ice  cream，well‑known';render()");
+ await t.nodes.get('#check').onclick();const html=t.nodes.get('#parsed').innerHTML;
+ assert.match(html,/共 4 项/);assert.match(html,/ice cream/);assert.match(html,/well-known/);
+ assert.match(html,/4 项已查到/);assert.doesNotMatch(html,/未作词典查证/);assert.equal(t.state().batches.length,1);
+});
+test('Q1 R5：格式错误须回输入框修正，不能静默忽略或绕过保存',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+ const field=t.nodes.get('#words');field.value='bear/ice，pear';field.oninput({target:field});await t.nodes.get('#check').onclick();
+ const save=t.nodes.get('#confirmAction').children[0];assert.equal(save.disabled,true);const before=t.state();save.onclick();assert.deepEqual(t.state(),before);
+ assert.doesNotMatch(t.nodes.get('#parsed').innerHTML,/id="ignoreInvalid"/);
+ field.value='pear';field.oninput({target:field});await t.nodes.get('#check').onclick();
+ t.nodes.get('#confirmAction').children[0].onclick();await settle();
+ const d=t.state(),batch=d.batches.at(-1);assert.equal(batch.originalInput,'bear/ice，pear');
+ assert.deepEqual(batch.wordIds.map(id=>d.words.find(w=>w.id===id).surface),['pear']);
+});
+test('Q1 R3：主动拆分后保存失败保留原输入，重试成功持久化实际确认结果',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+ const field=t.nodes.get('#words'),raw='pear     ice、ice cream。well‑known';field.value=raw;field.oninput({target:field});await t.nodes.get('#check').onclick();
+ t.nodes.get('#words').value=t.nodes.get('#words').value.replace(/pear +ice/,'pear\nice');t.nodes.get('#words').oninput({target:t.nodes.get('#words')});await t.nodes.get('#check').onclick();
+ assert.deepEqual(core.parse(t.nodes.get('#words').value).words,['pear','ice','ice cream','well-known']);
+ const before=t.state(),save=t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表');
+ t.run('globalThis.__originalSave=localStorage.setItem;localStorage.setItem=()=>{throw Error("full")}');save.onclick();
+ assert.deepEqual(t.state(),before);assert.match(t.nodes.get('#error').textContent,/没有完成/);
+ t.run('localStorage.setItem=globalThis.__originalSave');save.onclick();await settle();
+ const d=t.state(),batch=d.batches.at(-1);assert.equal(batch.originalInput,raw);
+ assert.deepEqual(batch.wordIds.map(id=>d.words.find(w=>w.id===id).surface),['pear','ice','ice cream','well-known']);
+ assert.deepEqual(d.batches[0],before.batches[0]);
+});
+test('Q1 R3：编辑后旧确认失效，重新检查才能保存新输入',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+ const initial=t.nodes.get('#words');initial.value='pear';initial.oninput({target:initial});await t.nodes.get('#check').onclick();
+ const old=t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表');
+ const field=t.nodes.get('#words');field.value='bear、river';field.oninput({target:field});
+ const before=t.state();old.onclick();assert.deepEqual(t.state(),before);
+ await t.nodes.get('#check').onclick();t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
+ const d=t.state(),batch=d.batches.at(-1);assert.equal(batch.originalInput,'pear');
+ assert.deepEqual(batch.wordIds.map(id=>d.words.find(w=>w.id===id).surface),['bear','river']);
+});
+test('Q1 R3：文件上传与粘贴共用输入规则，并保存上传原文',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+ const raw="well‑known。ice  cream、don't";
+ await t.nodes.get('#wordfile').onchange({target:{files:[{size:raw.length,name:'TEST ONLY.txt',text:async()=>raw}]}});
+ await t.nodes.get('#check').onclick();assert.match(t.nodes.get('#parsed').innerHTML,/共 3 项/);
+ t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
+ const d=t.state(),batch=d.batches.at(-1);assert.equal(batch.originalInput,raw);
+ assert.deepEqual(batch.wordIds.map(id=>d.words.find(w=>w.id===id).surface),['well-known','ice cream',"don't"]);
+});
+test('Q1 R3：拆分后手动纠错与失败重试仍保留最初来源，清空后才视为新输入',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+ const field=t.nodes.get('#words'),source='pear     ice、bad/word、well‑known';field.value=source;field.oninput({target:field});await t.nodes.get('#check').onclick();
+ t.nodes.get('#words').value=t.nodes.get('#words').value.replace(/pear +ice/,'pear\nice');t.nodes.get('#words').oninput({target:t.nodes.get('#words')});await t.nodes.get('#check').onclick();
+ field.value=field.value.replace('bad/word','river');field.oninput({target:field});await t.nodes.get('#check').onclick();
+ const save=t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表');
+ t.run('globalThis.__originalSave=localStorage.setItem;localStorage.setItem=()=>{throw Error("full")}');save.onclick();
+ assert.equal(t.state().batches.length,1);t.run('localStorage.setItem=globalThis.__originalSave');save.onclick();await settle();
+ const d=t.state(),batch=d.batches.at(-1);assert.equal(batch.originalInput,source);
+ assert.deepEqual(batch.wordIds.map(id=>d.words.find(w=>w.id===id).surface),['pear','ice','river','well-known']);
+ t.run("active=null;location.hash='#new';render()");const next=t.nodes.get('#words');
+ next.value='bear ice';next.oninput({target:next});await t.nodes.get('#check').onclick();
+ next.value='bear\nice';next.oninput({target:next});await t.nodes.get('#check').onclick();
+ next.value='';next.oninput({target:next});next.value='book';next.oninput({target:next});await t.nodes.get('#check').onclick();
+ t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
+ assert.equal(t.state().batches.at(-1).originalInput,'book');
+});
+test('Q1 R4：上传原文从读取起冻结，检查前后不经拆分的纠错均保留来源及失败重试',async()=>{
+ for(const checkFirst of [false,true]){
+  const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+  const source='pear/ice、book';
+  await t.nodes.get('#wordfile').onchange({target:{files:[{size:source.length,name:'SOURCE.txt',text:async()=>source}]}});
+  if(checkFirst)await t.nodes.get('#check').onclick();
+  const field=t.nodes.get('#words');field.value='pear、ice、book';field.oninput({target:field});await t.nodes.get('#check').onclick();
+  const save=t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表');
+  t.run('globalThis.__originalSave=localStorage.setItem;localStorage.setItem=()=>{throw Error("full")}');save.onclick();
+  assert.equal(t.state().batches.length,1);t.run('localStorage.setItem=globalThis.__originalSave');save.onclick();await settle();
+  const d=t.state(),batch=d.batches.at(-1);assert.equal(batch.originalInput,source);
+  assert.deepEqual(batch.wordIds.map(id=>d.words.find(w=>w.id===id).surface),['pear','ice','book']);
+ }
+});
+test('Q1 R4：普通键入在首次检查前跟随编辑，检查后纠错不覆盖来源',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+ const field=t.nodes.get('#words');field.value='pear/';field.oninput({target:field});
+ const source='pear/ice、book';field.value=source;field.oninput({target:field});await t.nodes.get('#check').onclick();
+ field.value='pear、ice、book';field.oninput({target:field});await t.nodes.get('#check').onclick();
+ t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
+ assert.equal(t.state().batches.at(-1).originalInput,source);
+});
+test('Q1 R4：空表单、纯空白和仅分隔符的检查或空文件不冻结来源',async()=>{
+ for(const raw of ['', ' \u3000 ', '、。\t,\n'])for(const fromFile of [false,true]){
+  const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+  if(fromFile)await t.nodes.get('#wordfile').onchange({target:{files:[{size:raw.length,name:'EMPTY.txt',text:async()=>raw}]}});
+  else{const empty=t.nodes.get('#words');empty.value=raw;empty.oninput({target:empty});}
+  await t.nodes.get('#check').onclick();
+  const field=t.nodes.get('#words');field.value='apple、pear';field.oninput({target:field});await t.nodes.get('#check').onclick();
+  t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
+  assert.equal(t.state().batches.at(-1).originalInput,'apple、pear');
+ }
+});
+test('Q1 R4：有内容但全不合规的来源仍保留，只有清空后才更新来源',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+ const field=t.nodes.get('#words');field.value='apple/pear';field.oninput({target:field});await t.nodes.get('#check').onclick();
+ field.value='apple、pear';field.oninput({target:field});await t.nodes.get('#check').onclick();
+ t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
+ assert.equal(t.state().batches.at(-1).originalInput,'apple/pear');
+});
+test('Q3a：全组待补显示明确终态，不允许用先学入口伪造进度',async()=>{
+ const t=await setup({allMissing:true,lookup:async()=>({status:'review_required'})});
+ assert.match(t.nodes.get('#lesson').innerHTML,/本词内容待补充/);
+ const choose=t.nodes.get('#waitingActions').children.find(n=>n.textContent.startsWith('先学本组已就绪词'));
+ assert.equal(choose.disabled,true);const before=t.state();choose.onclick();assert.deepEqual(t.state(),before);
+ assert.equal(t.state().batches[0].completedAt,null);
+});
+test('Q3a：启动核对尚未完成时，等待页不泄露声音、发音和默写的拼写',async()=>{
+ for(const phase of ['sound','pronounce','spell','spellRetry']){
+  const t=await setup({phase,lessonForm:'apple',auditDelayMs:20,capturePendingAudit:true});
+  assert(t.pendingAuditHtml);assert.doesNotMatch(t.pendingAuditHtml,/\bapple\b/i);
+  assert.match(t.pendingAuditHtml,/原词表第 1 项/);
+ }
+});
 test('Q6：原音结束只解锁当前自评，保留录音节点与滚动，不整页重绘',async()=>{
  const t=await setup({phase:'pronounce'});t.button('我已自己说出，接着听原音').onclick();
  const panel=t.element(n=>n.className==='recording-panel'),writes=t.rootWrites;t.ctx.window.scrollY=143;
@@ -234,4 +394,50 @@ test('Q5：答案中的HTML只作为文本，长输入仍能对照正确答案',
  const t=await setup({phase:'spell'});t.nodes.get('#spelling').value='<img src=x onerror=alert(1)>';t.button('提交并揭晓').onclick();const result=lessonMarkup(t);assert.doesNotMatch(result,/<(?:img|script)\b/i);assert(result.includes('&lt;img src=x onerror=alert(1)&gt;'));
  const long=await setup({phase:'spell'});long.nodes.get('#spelling').value='x'.repeat(20000);long.button('提交并揭晓').onclick();
  assert.equal(long.state().events.at(-1).correct,false);assert(lessonMarkup(long).includes('<p class="answer" lang="en">worda</p>'));assert.doesNotMatch(lessonMarkup(long),/<ul\b|漏写|多写|改为/);
+});
+test('R5: editing invalidates a pending check and never changes the entered words',async()=>{
+ let release;const t=await setup({inputChecker:raw=>new Promise(resolve=>{release=()=>resolve(inspectInput(raw,new Set(['pear'])));})});
+ t.run("active=null;location.hash='#new';render()");const field=t.nodes.get('#words');
+ field.value='pear';field.oninput({target:field});const pending=t.nodes.get('#check').onclick();
+ field.value='youuu';field.oninput({target:field});release();await pending;
+ assert.equal(field.value,'youuu');assert.match(t.nodes.get('#parsed').innerHTML,/输入已修改/);
+ assert.equal(t.run('preview'),null);assert.equal(t.state().batches.length,1);
+});
+test('R5: typing alone does not query, and checking does not mark words as ready or save anything',async()=>{
+ let calls=0;const t=await setup({inputChecker:async raw=>{calls++;return inspectInput(raw,new Set(['pear']));}});
+ t.run("active=null;location.hash='#new';render()");const before=t.state(),field=t.nodes.get('#words');
+ field.value='pear；youuu';field.oninput({target:field});assert.equal(calls,0);
+ await t.nodes.get('#check').onclick();assert.equal(calls,1);assert.deepEqual(t.state(),before);
+ assert.match(t.nodes.get('#parsed').innerHTML,/1 项需要调整/);assert.equal(field.value,'pear；youuu');
+});
+test('R5: pending check cannot paint the page after leaving the input form',async()=>{
+ let release;const t=await setup({inputChecker:raw=>new Promise(resolve=>{release=()=>resolve(inspectInput(raw,new Set(['pear'])));})});
+ t.run("active=null;location.hash='#new';draft='pear';render()");const pending=t.nodes.get('#check').onclick();
+ t.run("location.hash='#home';render()");const html=t.nodes.get('#app').innerHTML;release();await pending;
+ assert.equal(t.nodes.get('#app').innerHTML,html);assert.equal(t.run('preview'),null);
+});
+test('R5: leaving and returning before an old result arrives does not revive that result',async()=>{
+ let release;const t=await setup({inputChecker:raw=>new Promise(resolve=>{release=()=>resolve(inspectInput(raw,new Set(['pear'])));})});
+ t.run("active=null;location.hash='#new';draft='pear';render()");const pending=t.nodes.get('#check').onclick();
+ t.run("location.hash='#home';render();location.hash='#new';render()");release();await pending;
+ assert.equal(t.run('preview'),null);assert.equal(t.ctx.document.querySelector('#parsed').innerHTML,'');
+});
+test('R5: file-read failure during a check restores retry and preserves the original draft',async()=>{
+ let release;const t=await setup({inputChecker:raw=>new Promise(resolve=>{release=()=>resolve(inspectInput(raw,new Set(['pear'])));})});
+ t.run("active=null;location.hash='#new';draft='pear';render()");const before=t.state();
+ const pending=t.nodes.get('#check').onclick();assert.equal(t.nodes.get('#check').disabled,true);
+ await t.nodes.get('#wordfile').onchange({target:{files:[{size:1,name:'BROKEN.txt',text:async()=>{throw Error('read failed');}}]}});
+ release();await pending;
+ assert.equal(t.nodes.get('#check').disabled,false);assert.equal(t.nodes.get('#check').textContent,'检查词表 →');
+ assert.match(t.nodes.get('#parsed').innerHTML,/重新.*检查词表/);
+ assert.equal(t.run('draft'),'pear');assert.equal(t.run('inputOriginal'),'pear');assert.deepEqual(t.state(),before);
+});
+test('R5: late file-read failure cannot overwrite a newer successful check',async()=>{
+ let rejectFile;const t=await setup();t.run("active=null;location.hash='#new';render()");
+ const pending=t.nodes.get('#wordfile').onchange({target:{files:[{size:1,name:'OLD.txt',text:()=>new Promise((_,reject)=>{rejectFile=reject;})}]}});
+ const field=t.nodes.get('#words');field.value='pear';field.oninput({target:field});await t.nodes.get('#check').onclick();
+ const result=t.nodes.get('#parsed').innerHTML,before=t.nodes.get('#error').textContent;
+ rejectFile(Error('old read error'));await pending;
+ assert.equal(t.nodes.get('#error').textContent,before);assert.equal(t.nodes.get('#parsed').innerHTML,result);
+ assert.equal(t.run('draft'),'pear');assert.equal(t.nodes.get('#check').disabled,false);
 });
