@@ -422,3 +422,22 @@ test('R5: leaving and returning before an old result arrives does not revive tha
  t.run("location.hash='#home';render();location.hash='#new';render()");release();await pending;
  assert.equal(t.run('preview'),null);assert.equal(t.ctx.document.querySelector('#parsed').innerHTML,'');
 });
+test('R5: file-read failure during a check restores retry and preserves the original draft',async()=>{
+ let release;const t=await setup({inputChecker:raw=>new Promise(resolve=>{release=()=>resolve(inspectInput(raw,new Set(['pear'])));})});
+ t.run("active=null;location.hash='#new';draft='pear';render()");const before=t.state();
+ const pending=t.nodes.get('#check').onclick();assert.equal(t.nodes.get('#check').disabled,true);
+ await t.nodes.get('#wordfile').onchange({target:{files:[{size:1,name:'BROKEN.txt',text:async()=>{throw Error('read failed');}}]}});
+ release();await pending;
+ assert.equal(t.nodes.get('#check').disabled,false);assert.equal(t.nodes.get('#check').textContent,'检查词表 →');
+ assert.match(t.nodes.get('#parsed').innerHTML,/重新.*检查词表/);
+ assert.equal(t.run('draft'),'pear');assert.equal(t.run('inputOriginal'),'pear');assert.deepEqual(t.state(),before);
+});
+test('R5: late file-read failure cannot overwrite a newer successful check',async()=>{
+ let rejectFile;const t=await setup();t.run("active=null;location.hash='#new';render()");
+ const pending=t.nodes.get('#wordfile').onchange({target:{files:[{size:1,name:'OLD.txt',text:()=>new Promise((_,reject)=>{rejectFile=reject;})}]}});
+ const field=t.nodes.get('#words');field.value='pear';field.oninput({target:field});await t.nodes.get('#check').onclick();
+ const result=t.nodes.get('#parsed').innerHTML,before=t.nodes.get('#error').textContent;
+ rejectFile(Error('old read error'));await pending;
+ assert.equal(t.nodes.get('#error').textContent,before);assert.equal(t.nodes.get('#parsed').innerHTML,result);
+ assert.equal(t.run('draft'),'pear');assert.equal(t.nodes.get('#check').disabled,false);
+});

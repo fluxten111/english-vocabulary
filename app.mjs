@@ -1,7 +1,7 @@
-import {createInputChecker,inspectInput} from './spelling.mjs?v=20261108-input-r5';
+import {createInputChecker,inspectInput} from './spelling.mjs?v=20261108-input-r5f1';
 import {createFeedbackClient,feedbackRequest} from './sentence-feedback.mjs?v=20261031-rfix-final2';
 import {createRecorder} from './recording.mjs?v=20261031-rfix-final2';
-import {fresh,parse,scanInput,splitPhraseInput,norm,originalGroupWords,deferUnavailable,createBatch,session,selectContinueSession,getOrCreateReplay,currentId,ready,act,validate,merge,transaction,latestSentenceEvent,addSentenceFeedback,reviseSentence} from './core.mjs?v=20261108-input-r5';
+import {fresh,parse,scanInput,splitPhraseInput,norm,originalGroupWords,deferUnavailable,createBatch,session,selectContinueSession,getOrCreateReplay,currentId,ready,act,validate,merge,transaction,latestSentenceEvent,addSentenceFeedback,reviseSentence} from './core.mjs?v=20261108-input-r5f1';
 import {createPlayback} from './media.mjs?v=20261031-rfix-final2';
 import {createPreparer,createDictionaryClient,checkReviewedContent,reviewedUpgrade,canonical,preparationMessage} from './content.mjs?v=20261031-rfix-final2';
 import {contentConfig,sentenceFeedbackConfig} from './config.mjs?v=20261031-rfix-final2';
@@ -173,12 +173,19 @@ function renderForm(){
     $('#check').disabled=loadFailed;$('#check').textContent='检查词表 →';
   };
   $('#name').oninput=e=>name=e.target.value;
-  $('#wordfile').onchange=async e=>{try{
+  $('#wordfile').onchange=async e=>{let uploadVersion;try{
     const file=e.target.files[0];if(!file)return;if(file.size>2000000)throw Error('词表超过 2MB，请分成小份。');
-    const version=++inputCheckVersion;inputCheckController?.abort();const text=await file.text();
-    if(version!==inputCheckVersion||page()!=='new'||active||resumeId)return;
+    uploadVersion=++inputCheckVersion;inputCheckController?.abort();const text=await file.text();
+    if(uploadVersion!==inputCheckVersion||page()!=='new'||active||resumeId)return;
     draft=text;inputOriginal=draft;inputSourceLocked=scanInput(draft).length>0;preview=null;name ||=file.name;renderForm();
-  }catch(e){error.textContent=e.message;}};
+  }catch(e){
+    if(page()!=='new'||active||resumeId||(uploadVersion!==undefined&&uploadVersion!==inputCheckVersion))return;
+    error.textContent='文件没有读取成功，原输入已保留。'+e.message;
+    if(uploadVersion!==undefined){
+      preview=null;$('#check').disabled=loadFailed;$('#check').textContent='检查词表 →';
+      $('#parsed').innerHTML='<p class="input-updated" role="status">原输入已保留，请重新点击“检查词表”。</p>';
+    }
+  }};
   $('#check').onclick=async()=>{
     if(loadFailed)return;
     if(!inputSourceLocked){inputOriginal=draft;inputSourceLocked=scanInput(draft).length>0;}

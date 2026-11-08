@@ -1,4 +1,4 @@
-import {parse,scanInput,norm} from './core.mjs?v=20261108-input-r5';
+import {parse,scanInput,norm} from './core.mjs?v=20261108-input-r5f1';
 import {dictionaryInfo} from './spelling-data.mjs';
 
 // Spelling evidence only: never set teaching content or learning progress here.
