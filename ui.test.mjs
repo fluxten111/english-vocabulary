@@ -113,12 +113,13 @@ test('Q1 R3：主动拆分后保存失败保留原输入，重试成功持久化
  assert.deepEqual(d.batches[0],before.batches[0]);
 });
 test('Q1 R3：编辑后旧确认失效，重新检查才能保存新输入',async()=>{
- const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';draft='pear';render();preview=parse(draft);showParse()");
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+ const initial=t.nodes.get('#words');initial.value='pear';initial.oninput({target:initial});t.nodes.get('#check').onclick();
  const old=t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表');
  const field=t.nodes.get('#words');field.value='bear、river';field.oninput({target:field});
  const before=t.state();old.onclick();assert.deepEqual(t.state(),before);
  t.nodes.get('#check').onclick();t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
- const d=t.state(),batch=d.batches.at(-1);assert.equal(batch.originalInput,'bear、river');
+ const d=t.state(),batch=d.batches.at(-1);assert.equal(batch.originalInput,'pear');
  assert.deepEqual(batch.wordIds.map(id=>d.words.find(w=>w.id===id).surface),['bear','river']);
 });
 test('Q1 R3：文件上传与粘贴共用输入规则，并保存上传原文',async()=>{
@@ -146,6 +147,46 @@ test('Q1 R3：拆分后手动纠错与失败重试仍保留最初来源，清空
  next.value='';next.oninput({target:next});next.value='book';next.oninput({target:next});t.nodes.get('#check').onclick();
  t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
  assert.equal(t.state().batches.at(-1).originalInput,'book');
+});
+test('Q1 R4：上传原文从读取起冻结，检查前后不经拆分的纠错均保留来源及失败重试',async()=>{
+ for(const checkFirst of [false,true]){
+  const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+  const source='pear/ice、book';
+  await t.nodes.get('#wordfile').onchange({target:{files:[{size:source.length,name:'SOURCE.txt',text:async()=>source}]}});
+  if(checkFirst)t.nodes.get('#check').onclick();
+  const field=t.nodes.get('#words');field.value='pear、ice、book';field.oninput({target:field});t.nodes.get('#check').onclick();
+  const save=t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表');
+  t.run('globalThis.__originalSave=localStorage.setItem;localStorage.setItem=()=>{throw Error("full")}');save.onclick();
+  assert.equal(t.state().batches.length,1);t.run('localStorage.setItem=globalThis.__originalSave');save.onclick();await settle();
+  const d=t.state(),batch=d.batches.at(-1);assert.equal(batch.originalInput,source);
+  assert.deepEqual(batch.wordIds.map(id=>d.words.find(w=>w.id===id).surface),['pear','ice','book']);
+ }
+});
+test('Q1 R4：普通键入在首次检查前跟随编辑，检查后纠错不覆盖来源',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+ const field=t.nodes.get('#words');field.value='pear/';field.oninput({target:field});
+ const source='pear/ice、book';field.value=source;field.oninput({target:field});t.nodes.get('#check').onclick();
+ field.value='pear、ice、book';field.oninput({target:field});t.nodes.get('#check').onclick();
+ t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
+ assert.equal(t.state().batches.at(-1).originalInput,source);
+});
+test('Q1 R4：空表单、纯空白和仅分隔符的检查或空文件不冻结来源',async()=>{
+ for(const raw of ['', ' \u3000 ', '、。\t,\n'])for(const fromFile of [false,true]){
+  const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+  if(fromFile)await t.nodes.get('#wordfile').onchange({target:{files:[{size:raw.length,name:'EMPTY.txt',text:async()=>raw}]}});
+  else{const empty=t.nodes.get('#words');empty.value=raw;empty.oninput({target:empty});}
+  t.nodes.get('#check').onclick();
+  const field=t.nodes.get('#words');field.value='apple、pear';field.oninput({target:field});t.nodes.get('#check').onclick();
+  t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
+  assert.equal(t.state().batches.at(-1).originalInput,'apple、pear');
+ }
+});
+test('Q1 R4：有内容但全不合规的来源仍保留，只有清空后才更新来源',async()=>{
+ const t=await setup({lookup:async()=>({status:'review_required'})});t.run("active=null;location.hash='#new';render()");
+ const field=t.nodes.get('#words');field.value='apple/pear';field.oninput({target:field});t.nodes.get('#check').onclick();
+ field.value='apple、pear';field.oninput({target:field});t.nodes.get('#check').onclick();
+ t.nodes.get('#confirmAction').children.find(n=>n.textContent==='确认并保存词表').onclick();await settle();
+ assert.equal(t.state().batches.at(-1).originalInput,'apple/pear');
 });
 test('Q3a：全组待补显示明确终态，不允许用先学入口伪造进度',async()=>{
  const t=await setup({allMissing:true,lookup:async()=>({status:'review_required'})});

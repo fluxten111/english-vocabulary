@@ -1,13 +1,13 @@
 import {createFeedbackClient,feedbackRequest} from './sentence-feedback.mjs?v=20261031-rfix-final2';
 import {createRecorder} from './recording.mjs?v=20261031-rfix-final2';
-import {fresh,parse,scanInput,splitPhraseInput,norm,originalGroupWords,deferUnavailable,createBatch,session,selectContinueSession,getOrCreateReplay,currentId,ready,act,validate,merge,transaction,latestSentenceEvent,addSentenceFeedback,reviseSentence} from './core.mjs?v=20261107-q3a-r3';
+import {fresh,parse,scanInput,splitPhraseInput,norm,originalGroupWords,deferUnavailable,createBatch,session,selectContinueSession,getOrCreateReplay,currentId,ready,act,validate,merge,transaction,latestSentenceEvent,addSentenceFeedback,reviseSentence} from './core.mjs?v=20261108-q3a-r4';
 import {createPlayback} from './media.mjs?v=20261031-rfix-final2';
 import {createPreparer,createDictionaryClient,checkReviewedContent,reviewedUpgrade,canonical,preparationMessage} from './content.mjs?v=20261031-rfix-final2';
 import {contentConfig,sentenceFeedbackConfig} from './config.mjs?v=20261031-rfix-final2';
 import {reviewedContent,reviewedLessons} from './review-catalog.mjs?v=20261031-rfix-final2';
 const $=s=>document.querySelector(s), app=$('#app'), error=$('#error');
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let db=fresh(),active=null,resumeId=null,draft='',inputOriginal=null,inputTransformed=false,name='',preview=null,incoming=null,loadFailed=false,filter='all';
+let db=fresh(),active=null,resumeId=null,draft='',inputOriginal=null,inputSourceLocked=false,name='',preview=null,incoming=null,loadFailed=false,filter='all';
 let pageEpoch=0,mediaControls=null,recordControls=null,pronunciationControls=null,waitingControls=null,lastRenderedPosition=null;
 const checkedContent=new Map(),pendingContentUpgrades=new Map();
 try { const raw=localStorage.getItem('vocab-v01'); if(raw)db=validate(JSON.parse(raw)); }
@@ -161,11 +161,11 @@ function batchCards(batches,add=false){return batches.map(b=>{const pending=db.s
 function renderHome(){const target=selectContinueSession(db),pending=target?.session,b=pending?db.batches.find(b=>b.id===pending.batchId):null;const completed=db.batches.length&&!b;const focusTitle=b?escape(b.name):completed?'换一组词，继续探索':'从你的第一份词表开始';const focusDescription=b?`每组最多 10 词，按自己的节奏完成。`:completed?'已学词表都在，也可以随时再练一遍。':'课本里的生词、生活里遇到的表达，都可以。';app.innerHTML=heading('今天，学一点新东西。','不必一口气学很多，接着自己的节奏来。','我的学习',true)+`<div class="dashboard"><div class="main-column"><section class="focus-card">${art}<div class="focus-content"><p class="focus-label">${b?target.label:'你的词汇，由你选择'}</p><h2>${focusTitle}</h2><p>${focusDescription}</p>${b?`<div class="focus-meta"><span>${b.wordIds.length} 个词</span><span>${Math.ceil(b.wordIds.length/10)} 组</span></div>`:''}<div class="focus-actions">${b?`<button class="primary" data-resume="${pending.id}">${pending.status==='new'?'开始学习':'继续学习'} <span aria-hidden="true">→</span></button>`:'<button class="primary" data-go="new">＋ 添加词表</button>'}${db.batches.length?'<button class="text-button" data-go="lists">查看我的词表</button>':''}</div></div>${b?`<div class="focus-steps" aria-label="已完成 ${pending.group} 组，共 ${Math.ceil(b.wordIds.length/10)} 组">${Array.from({length:Math.ceil(b.wordIds.length/10)},(_,i)=>`<i class="${i<pending.group?'done':''}"></i>`).join('')}</div>`:''}</section><section class="home-replay" aria-labelledby="homeReplayTitle"><div><h2 id="homeReplayTitle">已学词再练</h2><p class="caption">${db.batches.some(x=>x.completedAt)?'按原学习流程进行，首次记录保留。':'完成一份词表后，可在这里再练。'}</p></div><button class="text-button" data-learned="true" ${db.batches.some(x=>x.completedAt)?'':'disabled'}>再练已学词 →</button></section>${b?progressMarkup(b.id):''}<p class="source-note"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 8v5 M10 5.5v1"/></svg><span>学习内容就绪情况与接入说明，可在下方进度及备份与设置中查看。</span></p><div class="section-title"><h2>我的词表</h2><button class="text-button" data-go="lists">查看全部 <span aria-hidden="true">→</span></button></div><div class="batch-grid">${batchCards([...db.batches].reverse().slice(0,3),true)}</div></div>${rail()}</div>`;}
 function renderLists(){const batches=[...db.batches].reverse().filter(b=>filter==='all'||(filter==='done'?b.completedAt:!b.completedAt));app.innerHTML=heading('我的词表','未完成的接着学，学过的随时再练。','把遇见的词，慢慢变成自己的',true)+`<div class="list-filters" role="group" aria-label="词表筛选">${[['all','全部'],['learning','待学'],['done','已学']].map(([f,t])=>`<button data-filter="${f}" class="${filter===f?'selected':''}" aria-pressed="${filter===f}">${t}</button>`).join('')}</div>${batches.length?`<div class="batch-grid list-grid">${batchCards(batches,true)}</div>`:`<div class="empty-list"><h3>${filter==='done'?'还没有完成的词表':filter==='learning'?'没有未完成的词表':'你的词表会保存在这里'}</h3><p>${filter==='done'?'完整学完一批词后，就能在这里找到并再练。':'添加自己的词，不用重新整理，也能随时继续。'}</p><button class="primary" data-go="new">添加词表</button></div>`}`;}
 function renderForm(){
-  app.innerHTML=heading('添加自己的词表','确认后先保存，再开始学习。','我的词表 / 添加词表')+`<section class="panel form-panel"><h2>想学哪些词？</h2><p>每行一个词，也支持逗号、分号、顿号或中文句号分隔；空格默认保留在同一项。</p><label class="field-label">词表名称<input id="name" type="text" maxlength="100" value="${escape(name)}" placeholder="例如：这周的课堂词汇"></label><label class="field-label">单词或短语<textarea id="words" placeholder="在这里粘贴你的词表">${escape(draft)}</textarea></label><p class="helper">保留你的输入顺序，去除重复，每组最多 10 词。</p><div class="form-footer"><label class="upload-button">↥ 从文件添加<input id="wordfile" type="file" accept=".txt,.csv,text/plain,text/csv" aria-label="上传词表"></label><button id="check" class="primary">检查词表 →</button></div><p class="helper">支持 UTF-8 的 .txt 或 .csv 文件，最大 2MB。</p><div id="parsed" aria-live="polite"></div></section>`;
-  $('#words').oninput=e=>{draft=e.target.value;if(!draft)inputTransformed=false;if(!inputTransformed)inputOriginal=draft;preview=null;$('#parsed').innerHTML='';};
+  app.innerHTML=heading('添加自己的词表','确认后先保存，再开始学习。','我的词表 / 添加词表')+`<section class="panel form-panel"><h2>想学哪些词？</h2><p>每行一个词，也支持逗号、分号、顿号或中文句号分隔；空格默认保留在同一项。</p><label class="field-label">词表名称<input id="name" type="text" maxlength="100" value="${escape(name)}" placeholder="例如：这周的课堂词汇"></label><label class="field-label">单词或短语<textarea id="words" placeholder="在这里粘贴你的词表">${escape(draft)}</textarea></label><p class="helper">保留你的输入顺序，去除重复，每组最多 10 词。原文会保留；清空输入框或重新上传可开始新输入。</p><div class="form-footer"><label class="upload-button">↥ 从文件添加<input id="wordfile" type="file" accept=".txt,.csv,text/plain,text/csv" aria-label="上传词表"></label><button id="check" class="primary">检查词表 →</button></div><p class="helper">支持 UTF-8 的 .txt 或 .csv 文件，最大 2MB。</p><div id="parsed" aria-live="polite"></div></section>`;
+  $('#words').oninput=e=>{draft=e.target.value;if(!scanInput(draft).length)inputSourceLocked=false;if(!inputSourceLocked)inputOriginal=draft;preview=null;$('#parsed').innerHTML='';};
   $('#name').oninput=e=>name=e.target.value;
-  $('#wordfile').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;if(file.size>2000000)throw Error('词表超过 2MB，请分成小份。');draft=await file.text();inputOriginal=draft;inputTransformed=false;preview=null;name ||=file.name;renderForm();}catch(e){error.textContent=e.message;}};
-  $('#check').onclick=()=>{inputOriginal??=draft;preview=parse(draft);showParse();};$('#check').disabled=loadFailed;
+  $('#wordfile').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;if(file.size>2000000)throw Error('词表超过 2MB，请分成小份。');draft=await file.text();inputOriginal=draft;inputSourceLocked=scanInput(draft).length>0;preview=null;name ||=file.name;renderForm();}catch(e){error.textContent=e.message;}};
+  $('#check').onclick=()=>{if(!inputSourceLocked){inputOriginal=draft;inputSourceLocked=scanInput(draft).length>0;}preview=parse(draft);showParse();};$('#check').disabled=loadFailed;
 }
 function showParse(){
   const checkedPreview=preview,checkedDraft=draft,originalInput=inputOriginal??draft;
@@ -177,7 +177,7 @@ function showParse(){
     const item=scanned.find(x=>x.text===surface);
     button(`将“${surface}”拆成多个单词`,()=>{
       if(preview!==checkedPreview||draft!==checkedDraft)return;
-      inputOriginal??=draft;draft=splitPhraseInput(draft,item.index);inputTransformed=true;$('#words').value=draft;preview=parse(draft);showParse();
+      inputOriginal??=draft;draft=splitPhraseInput(draft,item.index);inputSourceLocked=true;$('#words').value=draft;preview=parse(draft);showParse();
     },$('#phraseActions'),'text-button');
   }
   const ignore=preview.invalid.length?$('#ignoreInvalid'):null;
@@ -186,7 +186,7 @@ function showParse(){
     if(!canSave()){if(!loadFailed)error.textContent='请重新检查输入，并处理或明确确认忽略格式待处理项。';return;}
     const skip=$('#skip').checked;let batchId;
     if(update(d=>{batchId=createBatch(d,checkedDraft,name,skip,{ignoreInvalid:ignore?.checked===true,originalInput}).id;})){
-      draft='';inputOriginal=null;inputTransformed=false;name='';preview=null;go('home');startPreparation(batchId);
+      draft='';inputOriginal=null;inputSourceLocked=false;name='';preview=null;go('home');startPreparation(batchId);
     }
   },$('#confirmAction'),'primary');
   save.disabled=!canSave();if(ignore)ignore.onchange=()=>{save.disabled=!canSave();};
